@@ -3,7 +3,7 @@ Notes on this fork:
 * Don't use the linked, compiled rubyc binaries below--you'll need to compile rubyc by-hand.
 * This fork started as just some tweaks to the motor-admin fork to get it working on Ruby 3.1 for me.
 * This works with Ruby 3.1.3 now, thank-you @taraszka! 
-* As a tip from someone working with this, the embedded filesystem runs a bit slow. This matters mainly if you are doing heavy requires. One workaround is autoload. Autoload works well for cases when there's a constant that gets used (which triggers the require) when a particular item is going to be called.  For example, would trigger the require of 'json' in the example below. For items that won't be used in every codepaths, you can minimize total requires.
+* As a tip from someone working with this, the embedded filesystem runs a bit slow. This matters mainly if you are doing heavy requires. One workaround is autoload. Autoload works well for cases when there's a constant that gets used (which triggers the require) when a particular item is going to be called.  For example, accessing JSON triggers the require'ing of 'json' in the example below. For items that won't be used in every codepath, this strategy can help you minimize your total requires.
 
 ```ruby
 autoload :JSON, 'json'
