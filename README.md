@@ -3,7 +3,7 @@
 * Don't use the linked, compiled rubyc binaries below--you'll need to compile rubyc by-hand. I haven't had a chance to collect a rubyc for each platform yet and update the links. PR's are welcome, especially as I don't have a windows machine!
 * Note that if you want to support M1 and Intel macs, you need to compile a separate rubyc for each, and build a separate packed binary for each. 
 * This fork started as just some tweaks to the motor-admin fork to get it working on Ruby 3.1.0 for me.
-* This works with Ruby 3.1.3 now, thank-you @taraszka! 
+* This works with Ruby 3.1.3 now and MacOs Ventura, thank-you @taraszka!
 * As a tip, the embedded filesystem runs a bit slow. This mainly matters when your app is doing many heavy requires, like the AWS ruby gem. One workaround is to autoload your requires. Autoload works well for cases when there's a constant that can be used to trigger the require for a particular item.  For example, accessing JSON triggers the require of 'json' in the example below. For items that aren't used in every codepath, this strategy can greatly minimize your total requires.
 
 ```ruby
