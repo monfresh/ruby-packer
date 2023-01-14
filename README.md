@@ -1,6 +1,6 @@
 Notes on this fork:
 
-* Don't use the linked, compiled rubyc binaries below--you'll need to compile rubyc by-hand.
+* Don't use the linked, compiled rubyc binaries below--you'll need to compile rubyc by-hand. Note that if you want to support M1 and Intel macs, you need to compile a separate rubyc for each, and build a separate packed binary for each. I haven't had a chance to collect a rubyc for each yet and update the links. PR's are welcome, especially as I don't have a windows machine.
 * This fork started as just some tweaks to the motor-admin fork to get it working on Ruby 3.1 for me.
 * This works with Ruby 3.1.3 now, thank-you @taraszka! 
 * As a tip from someone working with this, the embedded filesystem runs a bit slow. This matters mainly if you are doing heavy requires. One workaround is autoload. Autoload works well for cases when there's a constant that gets used (which triggers the require) when a particular item is going to be called.  For example, accessing JSON triggers the require'ing of 'json' in the example below. For items that won't be used in every codepath, this strategy can help you minimize your total requires.
