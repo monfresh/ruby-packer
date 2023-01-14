@@ -1,9 +1,10 @@
-Notes on this fork:
+### Notes on this Fork
 
-* Don't use the linked, compiled rubyc binaries below--you'll need to compile rubyc by-hand. Note that if you want to support M1 and Intel macs, you need to compile a separate rubyc for each, and build a separate packed binary for each. I haven't had a chance to collect a rubyc for each yet and update the links. PR's are welcome, especially as I don't have a windows machine.
-* This fork started as just some tweaks to the motor-admin fork to get it working on Ruby 3.1 for me.
+* Don't use the linked, compiled rubyc binaries below--you'll need to compile rubyc by-hand. I haven't had a chance to collect a rubyc for each platform yet and update the links. PR's are welcome, especially as I don't have a windows machine!
+* Note that if you want to support M1 and Intel macs, you need to compile a separate rubyc for each, and build a separate packed binary for each. 
+* This fork started as just some tweaks to the motor-admin fork to get it working on Ruby 3.1.0 for me.
 * This works with Ruby 3.1.3 now, thank-you @taraszka! 
-* As a tip from someone working with this, the embedded filesystem runs a bit slow. This matters mainly if you are doing heavy requires. One workaround is autoload. Autoload works well for cases when there's a constant that gets used (which triggers the require) when a particular item is going to be called.  For example, accessing JSON triggers the require'ing of 'json' in the example below. For items that won't be used in every codepath, this strategy can help you minimize your total requires.
+* As a tip, the embedded filesystem runs a bit slow. This mainly matters when your app is doing many heavy requires, like the AWS ruby gem. One workaround is to autoload your requires. Autoload works well for cases when there's a constant that can be used to trigger the require for a particular item.  For example, accessing JSON triggers the require of 'json' in the example below. For items that aren't used in every codepath, this strategy can greatly minimize your total requires.
 
 ```ruby
 autoload :JSON, 'json'
@@ -13,7 +14,7 @@ JSON.parse(doc)
 # now 'json' is, it was loaded on the fly
 ```
 
-Autoload _was_ considered for deprecation, but that's no longer the case, which is good, because it is useful! 
+Autoload _was_ being considered for deprecation, but that's no longer the case.
 
 -------------------------------------------------------
 # Ruby Packer
