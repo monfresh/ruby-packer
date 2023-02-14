@@ -110,7 +110,8 @@ class Compiler
               elsif @options[:debug]
                 ' -DRUBY_DEBUG -fPIC -g -O0 -pipe '
               else
-                ' -DRUBY_DEBUG -fPIC -O3 -fno-fast-math -ggdb3 -Os -fdata-sections -ffunction-sections -pipe -Wno-error=implicit-function-declaration '
+                #' -DRUBY_DEBUG -fPIC -O3 -fno-fast-math -ggdb3 -Os -fdata-sections -ffunction-sections -pipe -Wno-error=implicit-function-declaration '
+                ' -fPIC -O3 -fno-fast-math -Os -fdata-sections -ffunction-sections -pipe -Wno-error=implicit-function-declaration '
               end
 
     # install prefix for stuffed libraries
@@ -570,7 +571,7 @@ class Compiler
         @utils.run(compile_env,
                    './Configure',
                    'darwin64-arm64-cc',
-                   'shared',
+                   'no-shared',
                    'enable-rc5',
                    'zlib',
                    'no-asm',
@@ -583,7 +584,7 @@ class Compiler
                    'perl',
                    'Configure',
                    'linux-aarch64',
-                   'shared',
+                   'no-shared',
                    "--openssldir=#{@options[:openssl_dir]}",
                    "--prefix=#{@local_build}")
         @utils.run(compile_env, "make #{@options[:nmake_args]}")
