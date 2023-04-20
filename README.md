@@ -1,10 +1,9 @@
 ### Notes on this Fork
 
-* Don't use the linked, compiled rubyc binaries below--you'll need to compile rubyc by-hand. I haven't had a chance to collect a rubyc for each platform yet and update the links. PR's are welcome, especially as I don't have a windows machine!
-* Note that if you want to support M1 and Intel macs, you need to compile a separate rubyc for each, and build a separate packed binary for each. 
-* This fork started as just some tweaks to the motor-admin fork to get it working on Ruby 3.1.0 for me.
-* This works with Ruby 3.1.3 now and MacOs Ventura, thank-you @taraszka!
-* As a tip, the embedded filesystem runs a bit slow. This mainly matters when your app is doing many heavy requires, like the AWS ruby gem. One workaround is to autoload your requires. Autoload works well for cases when there's a constant that can be used to trigger the require for a particular item.  For example, accessing JSON triggers the require of 'json' in the example below. For items that aren't used in every codepath, this strategy can greatly minimize your total requires.
+* Built rubyc files for mac/linux are now found [here](https://github.com/ericbeland/ruby-packer/releases/tag/3_1_3). I don't have a windows machine, so I have not had a chance build a windows ruby. I'd love a contribution.
+* Note that if you want to support M1 and Intel macs, you need to build a separate packed binary for each one on the correct type of machine. I haven't found a way around that!
+* History:  This fork started as just some tweaks to the motor-admin fork to get it working on Ruby 3.1.0 for me. This works with Ruby 3.1.3 now and MacOs Ventura, thank-you @taraszka!
+* As a tip, the embedded filesystem runs a bit slow. This mainly matters when your app is doing many heavy requires, like the AWS ruby gem. One workaround is to autoload your requires. Autoload works well for cases when there's a constant that can be used to trigger the require for a particular item. For example, accessing JSON triggers the require of 'json' in the example below. For items that aren't used in every codepath, this strategy can greatly minimize your total requires, assuming you don't need every require 
 
 ```ruby
 autoload :JSON, 'json'
@@ -14,7 +13,7 @@ JSON.parse(doc)
 # now 'json' is, it was loaded on the fly
 ```
 
-Autoload _was_ being considered for deprecation, but that's no longer the case.
+Autoload _was_ being considered for deprecation, but that's no longer the case, so fear not.
 
 -------------------------------------------------------
 # Ruby Packer
@@ -48,23 +47,9 @@ You won't need to modify a single line of code in your application, no matter ho
 
 ### Stable Releases
 
-Here is the latest stable Ruby Packer release:
+Built rubyc files for the latest releases can be found [here](https://github.com/ericbeland/ruby-packer/releases/tag/3_1_3):
 
-|    OS     | Arch. |                                              Executable                                                      |
-|:---------:|:-----:|--------------------------------------------------------------------------------------------------------------|
-|  Windows  |  x64  | https://gw.alipayobjects.com/os/rmsportal/WxwlPrUTTReYNVVxJMtR.zip                                           |
-|   macOS   |  x64  | https://gw.alipayobjects.com/os/enclose-prod/b812fa0f-d52b-44f1-8233-65ab8707cf1f/rubyc-v0.4.0-darwin-x64.gz |
-|   Linux   |  x64  | https://gw.alipayobjects.com/os/enclose-prod/1fd23e6b-d48f-4ed0-94dd-f0f539960253/rubyc-v0.4.0-linux-x64.gz  |
-
-### Unstable Pre-release
-
-Whenever the `master` branch CI succeeded, a Ruby Packer pre-release binary would be automatically generated. Here is the latest unstable pre-release build:
-
-|    OS     | Arch. |                               Executable                                      |
-|:---------:|:-----:|-------------------------------------------------------------------------------|
-|  Windows  |  x64  | https://github.com/pmq20/ruby-packer/releases/download/windows-x64/rubyc.exe  |
-|   macOS   |  x64  | https://github.com/pmq20/ruby-packer/releases/download/darwin-x64/rubyc       |
-|   Linux   |  x64  | https://github.com/pmq20/ruby-packer/releases/download/linux-x64/rubyc        |
+Currently windows *may* work, but it is untested, and you'll need to build rubyc on your own. 
 
 ## Install
 
