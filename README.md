@@ -106,7 +106,7 @@ Run `chmod +x` to give it execution permissions and execute `./rubyc --help`.
     -o, --output=FILE                The path of the output file
     -d, --tmpdir=DIR                 The directory for temporary files
         --keep-tmpdir                Keeps all temporary files that were generated last time
-        --openssl-dir                The path to openssl
+        --openssl-dir                The path to the dir containing cert.pem
         --make-args=ARGS             Extra arguments to be passed to make
         --nmake-args=ARGS            Extra arguments to be passed to nmake
     -i, --ignore-file=STRING         Ignore file(s) from build
@@ -126,6 +126,8 @@ By default this path is set to `/usr/local/etc/openssl/` but can be overridden u
 
 Keep in mind that users running your compiled package should have their certifications
 present in this directory as well.
+
+If you're building for macOS, you should set `--openssl-dir` to `/private/etc/ssl`.
 
 ### The `--ignore-file` Option
 
