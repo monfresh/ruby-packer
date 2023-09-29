@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2022 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2016-2023 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -42,6 +42,7 @@ static int tls_dump_puts(BIO *bp, const char *str);
 static BIO_METHOD *method_tls_dump = NULL;
 static BIO_METHOD *meth_mem = NULL;
 static BIO_METHOD *meth_always_retry = NULL;
+static int retry_err = -1;
 
 /* Note: Not thread safe! */
 const BIO_METHOD *bio_f_tls_dump_filter(void)
@@ -406,13 +407,13 @@ static int mempacket_test_read(BIO *bio, char *out, int outl)
     }
 
     memcpy(out, thispkt->data, outl);
-
     mempacket_free(thispkt);
     return outl;
 }
 
 /*
- * Look for records from different epochs and swap them around
+ * Look for records from different epochs in the last datagram and swap them
+ * around
  */
 int mempacket_swap_epoch(BIO *bio)
 {
@@ -493,36 +494,39 @@ int mempacket_swap_epoch(BIO *bio)
     return 0;
 }
 
-/* Take the last and penultimate packets and swap them around */
-int mempacket_swap_recent(BIO *bio)
+/* Move packet from position s to position d in the list (d < s) */
+int mempacket_move_packet(BIO *bio, int d, int s)
 {
     MEMPACKET_TEST_CTX *ctx = BIO_get_data(bio);
     MEMPACKET *thispkt;
     int numpkts = sk_MEMPACKET_num(ctx->pkts);
+    int i;
 
-    /* We need at least 2 packets to be able to swap them */
-    if (numpkts <= 1)
+    if (d >= s)
         return 0;
 
-    /* Get the penultimate packet */
-    thispkt = sk_MEMPACKET_value(ctx->pkts, numpkts - 2);
+    /* We need at least s + 1 packets to be able to swap them */
+    if (numpkts <= s)
+        return 0;
+
+    /* Get the packet at position s */
+    thispkt = sk_MEMPACKET_value(ctx->pkts, s);
     if (thispkt == NULL)
         return 0;
 
-    if (sk_MEMPACKET_delete(ctx->pkts, numpkts - 2) != thispkt)
+    /* Remove and re-add it */
+    if (sk_MEMPACKET_delete(ctx->pkts, s) != thispkt)
         return 0;
 
-    /* Re-add it to the end of the list */
-    thispkt->num++;
-    if (sk_MEMPACKET_insert(ctx->pkts, thispkt, numpkts - 1) <= 0)
+    thispkt->num -= (s - d);
+    if (sk_MEMPACKET_insert(ctx->pkts, thispkt, d) <= 0)
         return 0;
 
-    /* We also have to adjust the packet number of the other packet */
-    thispkt = sk_MEMPACKET_value(ctx->pkts, numpkts - 2);
-    if (thispkt == NULL)
-        return 0;
-    thispkt->num--;
-
+    /* Increment the packet numbers for moved packets */
+    for (i = d + 1; i <= s; i++) {
+        thispkt = sk_MEMPACKET_value(ctx->pkts, i);
+        thispkt->num++;
+    }
     return 1;
 }
 
@@ -757,16 +761,21 @@ static int always_retry_free(BIO *bio)
     return 1;
 }
 
+void set_always_retry_err_val(int err)
+{
+    retry_err = err;
+}
+
 static int always_retry_read(BIO *bio, char *out, int outl)
 {
     BIO_set_retry_read(bio);
-    return -1;
+    return retry_err;
 }
 
 static int always_retry_write(BIO *bio, const char *in, int inl)
 {
     BIO_set_retry_write(bio);
-    return -1;
+    return retry_err;
 }
 
 static long always_retry_ctrl(BIO *bio, int cmd, long num, void *ptr)
@@ -792,13 +801,13 @@ static long always_retry_ctrl(BIO *bio, int cmd, long num, void *ptr)
 static int always_retry_gets(BIO *bio, char *buf, int size)
 {
     BIO_set_retry_read(bio);
-    return -1;
+    return retry_err;
 }
 
 static int always_retry_puts(BIO *bio, const char *str)
 {
     BIO_set_retry_write(bio);
-    return -1;
+    return retry_err;
 }
 
 int create_ssl_ctx_pair(OSSL_LIB_CTX *libctx, const SSL_METHOD *sm,

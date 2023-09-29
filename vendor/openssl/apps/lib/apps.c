@@ -1,5 +1,5 @@
 /*
- * Copyright 1995-2022 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 1995-2023 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -630,13 +630,13 @@ void *app_malloc(size_t sz, const char *what)
 char *next_item(char *opt) /* in list separated by comma and/or space */
 {
     /* advance to separator (comma or whitespace), if any */
-    while (*opt != ',' && !isspace(*opt) && *opt != '\0')
+    while (*opt != ',' && !isspace(_UC(*opt)) && *opt != '\0')
         opt++;
     if (*opt != '\0') {
         /* terminate current item */
         *opt++ = '\0';
         /* skip over any whitespace after separator */
-        while (isspace(*opt))
+        while (isspace(_UC(*opt)))
             opt++;
     }
     return *opt == '\0' ? NULL : opt; /* NULL indicates end of input */
@@ -940,7 +940,7 @@ int load_key_certs_crls(const char *uri, int format, int maybe_stdin,
         BIO *bio;
 
         if (!maybe_stdin) {
-            BIO_printf(bio_err, "No filename or uri specified for loading");
+            BIO_printf(bio_err, "No filename or uri specified for loading\n");
             goto end;
         }
         uri = "<stdin>";
@@ -956,10 +956,8 @@ int load_key_certs_crls(const char *uri, int format, int maybe_stdin,
         ctx = OSSL_STORE_open_ex(uri, libctx, propq, get_ui_method(), &uidata,
                                  params, NULL, NULL);
     }
-    if (ctx == NULL) {
-        BIO_printf(bio_err, "Could not open file or uri for loading");
+    if (ctx == NULL)
         goto end;
-    }
     if (expect > 0 && !OSSL_STORE_expect(ctx, expect))
         goto end;
 
@@ -1671,7 +1669,10 @@ CA_DB *load_index(const char *dbfile, DB_ATTR *db_attr)
         char *p = NCONF_get_string(dbattr_conf, NULL, "unique_subject");
         if (p) {
             retdb->attributes.unique_subject = parse_yesno(p, 1);
+        } else {
+            ERR_clear_error();
         }
+
     }
 
     retdb->dbfname = OPENSSL_strdup(dbfile);
@@ -1937,16 +1938,17 @@ X509_NAME *parse_name(const char *cp, int chtype, int canmulti,
         nid = OBJ_txt2nid(typestr);
         if (nid == NID_undef) {
             BIO_printf(bio_err,
-                       "%s: Skipping unknown %s name attribute \"%s\"\n",
+                       "%s warning: Skipping unknown %s name attribute \"%s\"\n",
                        opt_getprog(), desc, typestr);
             if (ismulti)
                 BIO_printf(bio_err,
-                           "Hint: a '+' in a value string needs be escaped using '\\' else a new member of a multi-valued RDN is expected\n");
+                           "%s hint: a '+' in a value string needs be escaped using '\\' else a new member of a multi-valued RDN is expected\n",
+                           opt_getprog());
             continue;
         }
         if (*valstr == '\0') {
             BIO_printf(bio_err,
-                       "%s: No value provided for %s name attribute \"%s\", skipped\n",
+                       "%s warning: No value provided for %s name attribute \"%s\", skipped\n",
                        opt_getprog(), desc, typestr);
             continue;
         }
@@ -2000,7 +2002,8 @@ int bio_to_mem(unsigned char **out, int maxlen, BIO *in)
             BIO_free(mem);
             return -1;
         }
-        maxlen -= len;
+        if (maxlen != -1)
+            maxlen -= len;
 
         if (maxlen == 0)
             break;
@@ -2466,6 +2469,10 @@ BIO *app_http_tls_cb(BIO *bio, void *arg, int connect, int detail)
     if (connect) {
         SSL *ssl;
         BIO *sbio = NULL;
+        X509_STORE *ts = SSL_CTX_get_cert_store(ssl_ctx);
+        X509_VERIFY_PARAM *vpm = X509_STORE_get0_param(ts);
+        const char *host = vpm == NULL ? NULL :
+            X509_VERIFY_PARAM_get0_host(vpm, 0 /* first hostname */);
 
         /* adapt after fixing callback design flaw, see #17088 */
         if ((info->use_proxy
@@ -2480,8 +2487,8 @@ BIO *app_http_tls_cb(BIO *bio, void *arg, int connect, int detail)
             return NULL;
         }
 
-        /* adapt after fixing callback design flaw, see #17088 */
-        SSL_set_tlsext_host_name(ssl, info->server); /* not critical to do */
+        if (vpm != NULL)
+            SSL_set_tlsext_host_name(ssl, host /* may be NULL */);
 
         SSL_set_connect_state(ssl);
         BIO_set_ssl(sbio, ssl, BIO_CLOSE);

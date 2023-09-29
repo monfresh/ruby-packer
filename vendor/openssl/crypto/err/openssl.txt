@@ -233,7 +233,9 @@ CMP_R_MISSING_KEY_USAGE_DIGITALSIGNATURE:142:missing key usage digitalsignature
 CMP_R_MISSING_P10CSR:121:missing p10csr
 CMP_R_MISSING_PBM_SECRET:166:missing pbm secret
 CMP_R_MISSING_PRIVATE_KEY:131:missing private key
+CMP_R_MISSING_PRIVATE_KEY_FOR_POPO:190:missing private key for popo
 CMP_R_MISSING_PROTECTION:143:missing protection
+CMP_R_MISSING_PUBLIC_KEY:183:missing public key
 CMP_R_MISSING_REFERENCE_CERT:168:missing reference cert
 CMP_R_MISSING_SECRET:178:missing secret
 CMP_R_MISSING_SENDER_IDENTIFICATION:111:missing sender identification
@@ -1687,6 +1689,7 @@ X509_R_CERTIFICATE_VERIFICATION_FAILED:139:certificate verification failed
 X509_R_CERT_ALREADY_IN_HASH_TABLE:101:cert already in hash table
 X509_R_CRL_ALREADY_DELTA:127:crl already delta
 X509_R_CRL_VERIFY_FAILURE:131:crl verify failure
+X509_R_DUPLICATE_ATTRIBUTE:140:duplicate attribute
 X509_R_ERROR_GETTING_MD_BY_NID:141:error getting md by nid
 X509_R_ERROR_USING_SIGINF_SET:142:error using siginf set
 X509_R_IDP_MISMATCH:128:idp mismatch
