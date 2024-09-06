@@ -499,7 +499,7 @@ describe "Module#prepend" do
     c.dup.new.should be_kind_of(m)
   end
 
-  ruby_version_is '0'...'3.0' do
+  ruby_version_is ''...'3.0' do
     it "keeps the module in the chain when dupping an intermediate module" do
       m1 = Module.new { def calc(x) x end }
       m2 = Module.new { prepend(m1) }
@@ -609,6 +609,18 @@ describe "Module#prepend" do
 
     c = Class.new { prepend(m) }
     ScratchPad.recorded.should == [[:prepend_features, c], [:prepended, c]]
+  end
+
+  it "prepends a module if it is included in a super class" do
+    module ModuleSpecs::M3
+      module M; end
+      class A; include M; end
+      class B < A; prepend M; end
+
+      all = [A, B, M]
+
+      (B.ancestors.filter { |a| all.include?(a) }).should == [M, B, A, M]
+    end
   end
 
   it "detects cyclic prepends" do

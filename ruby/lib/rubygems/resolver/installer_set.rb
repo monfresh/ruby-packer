@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 ##
 # A set of gems for installation sourced from remote sources and local .gem
 # files
@@ -66,7 +67,7 @@ class Gem::Resolver::InstallerSet < Gem::Resolver::Set
 
     found = found.select do |s|
       Gem::Source::SpecificFile === s.source ||
-        Gem::Platform.match(s.platform)
+        Gem::Platform.match_spec?(s)
     end
 
     found = found.sort_by do |s|
@@ -147,6 +148,8 @@ class Gem::Resolver::InstallerSet < Gem::Resolver::Set
       res << Gem::Resolver::InstalledSpecification.new(self, gemspec)
     end unless @ignore_installed
 
+    matching_local = []
+
     if consider_local?
       matching_local = @local.values.select do |spec, _|
         req.match? spec
@@ -167,7 +170,7 @@ class Gem::Resolver::InstallerSet < Gem::Resolver::Set
       end
     end
 
-    res.concat @remote_set.find_all req if consider_remote?
+    res.concat @remote_set.find_all req if consider_remote? && matching_local.empty?
 
     res
   end

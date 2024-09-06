@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 require_relative "helper"
 
 class TestGemSourceLock < Gem::TestCase
@@ -18,7 +19,7 @@ class TestGemSourceLock < Gem::TestCase
   end
 
   def test_equals2
-    git    = Gem::Source::Git.new "a", "git/a", "master", false
+    git    = Gem::Source::Git.new "a", "git/a", nil, false
     g_lock = Gem::Source::Lock.new git
 
     installed = Gem::Source::Installed.new
@@ -30,7 +31,7 @@ class TestGemSourceLock < Gem::TestCase
   end
 
   def test_spaceship
-    git    = Gem::Source::Git.new "a", "git/a", "master", false
+    git    = Gem::Source::Git.new "a", "git/a", nil, false
     g_lock = Gem::Source::Lock.new git
 
     installed = Gem::Source::Installed.new
@@ -54,7 +55,7 @@ class TestGemSourceLock < Gem::TestCase
   end
 
   def test_spaceship_git
-    git  = Gem::Source::Git.new "a", "git/a", "master", false
+    git  = Gem::Source::Git.new "a", "git/a", nil, false
     lock = Gem::Source::Lock.new git
 
     assert_equal(1, lock.<=>(git),  "lock <=> git")

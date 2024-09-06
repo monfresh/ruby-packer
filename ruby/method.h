@@ -75,7 +75,6 @@ typedef struct rb_callable_method_entry_struct { /* same fields with rb_method_e
 #define METHOD_ENTRY_CACHED_SET(me)          ((me)->flags |= IMEMO_FL_USER4)
 #define METHOD_ENTRY_INVALIDATED(me)         ((me)->flags & IMEMO_FL_USER5)
 #define METHOD_ENTRY_INVALIDATED_SET(me)     ((me)->flags |= IMEMO_FL_USER5)
-#define METHOD_ENTRY_CACHEABLE(me)           !(METHOD_ENTRY_VISI(me) == METHOD_VISI_PROTECTED)
 
 static inline void
 METHOD_ENTRY_VISI_SET(rb_method_entry_t *me, rb_method_visibility_t visi)
@@ -102,8 +101,9 @@ static inline void
 METHOD_ENTRY_FLAGS_COPY(rb_method_entry_t *dst, const rb_method_entry_t *src)
 {
     dst->flags =
-      (dst->flags & ~(IMEMO_FL_USER0|IMEMO_FL_USER1|IMEMO_FL_USER2)) |
-        (src->flags & (IMEMO_FL_USER0|IMEMO_FL_USER1|IMEMO_FL_USER2));
+      (dst->flags & ~(IMEMO_FL_USER0|IMEMO_FL_USER1|IMEMO_FL_USER2
+      |IMEMO_FL_USER3)) |
+        (src->flags & (IMEMO_FL_USER0|IMEMO_FL_USER1|IMEMO_FL_USER2|IMEMO_FL_USER3));
 }
 
 typedef enum {
@@ -179,9 +179,9 @@ typedef struct rb_method_optimized {
 struct rb_method_definition_struct {
     BITFIELD(rb_method_type_t, type, VM_METHOD_TYPE_MINIMUM_BITS);
     unsigned int iseq_overload: 1;
-    int alias_count : 27;
-    int complemented_count : 28;
     unsigned int no_redef_warning: 1;
+    unsigned int aliased : 1;
+    int reference_count : 28;
 
     union {
         rb_method_iseq_t iseq;
@@ -214,7 +214,7 @@ void rb_add_method_optimized(VALUE klass, ID mid, enum method_optimized_type, un
 void rb_add_refined_method_entry(VALUE refined_class, ID mid);
 
 rb_method_entry_t *rb_method_entry_set(VALUE klass, ID mid, const rb_method_entry_t *, rb_method_visibility_t noex);
-rb_method_entry_t *rb_method_entry_create(ID called_id, VALUE klass, rb_method_visibility_t visi, const rb_method_definition_t *def);
+rb_method_entry_t *rb_method_entry_create(ID called_id, VALUE klass, rb_method_visibility_t visi, rb_method_definition_t *def);
 
 const rb_method_entry_t *rb_method_entry_at(VALUE obj, ID id);
 
@@ -227,6 +227,7 @@ const rb_method_entry_t *rb_resolve_me_location(const rb_method_entry_t *, VALUE
 RUBY_SYMBOL_EXPORT_END
 
 const rb_callable_method_entry_t *rb_callable_method_entry(VALUE klass, ID id);
+const rb_callable_method_entry_t *rb_callable_method_entry_or_negative(VALUE klass, ID id);
 const rb_callable_method_entry_t *rb_callable_method_entry_with_refinements(VALUE klass, ID id, VALUE *defined_class);
 const rb_callable_method_entry_t *rb_callable_method_entry_without_refinements(VALUE klass, ID id, VALUE *defined_class);
 

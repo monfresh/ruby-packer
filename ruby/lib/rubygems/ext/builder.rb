@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 #--
 # Copyright 2006 by Chad Fowler, Rich Kilmer, Jim Weirich and others.
 # All rights reserved.
@@ -6,6 +7,7 @@
 #++
 
 require_relative "../user_interaction"
+require_relative "../shellwords"
 
 class Gem::Ext::Builder
   include Gem::UserInteraction
@@ -17,7 +19,7 @@ class Gem::Ext::Builder
     $1.downcase
   end
 
-  def self.make(dest_path, results, make_dir = Dir.pwd, sitedir = nil)
+  def self.make(dest_path, results, make_dir = Dir.pwd, sitedir = nil, targets = ["clean", "", "install"])
     unless File.exist? File.join(make_dir, "Makefile")
       raise Gem::InstallError, "Makefile not found"
     end
@@ -26,7 +28,7 @@ class Gem::Ext::Builder
     RbConfig::CONFIG["configure_args"] =~ /with-make-prog\=(\w+)/
     make_program_name = ENV["MAKE"] || ENV["make"] || $1
     unless make_program_name
-      make_program_name = (/mswin/ =~ RUBY_PLATFORM) ? "nmake" : "make"
+      make_program_name = (RUBY_PLATFORM.include?("mswin")) ? "nmake" : "make"
     end
     make_program = Shellwords.split(make_program_name)
 
@@ -40,7 +42,7 @@ class Gem::Ext::Builder
       env << "sitelibdir=%s" % sitedir
     end
 
-    ["clean", "", "install"].each do |target|
+    targets.each do |target|
       # Pass DESTDIR via command line to override what's in MAKEFLAGS
       cmd = [
         *make_program,
@@ -55,6 +57,22 @@ class Gem::Ext::Builder
     end
   end
 
+  def self.ruby
+    # Gem.ruby is quoted if it contains whitespace
+    cmd = Shellwords.split(Gem.ruby)
+
+    # This load_path is only needed when running rubygems test without a proper installation.
+    # Prepending it in a normal installation will cause problem with order of $LOAD_PATH.
+    # Therefore only add load_path if it is not present in the default $LOAD_PATH.
+    load_path = File.expand_path("../..", __dir__)
+    case load_path
+    when RbConfig::CONFIG["sitelibdir"], RbConfig::CONFIG["vendorlibdir"], RbConfig::CONFIG["rubylibdir"]
+      cmd
+    else
+      cmd << "-I#{load_path}"
+    end
+  end
+
   def self.run(command, results, command_name = nil, dir = Dir.pwd, env = {})
     verbose = Gem.configuration.really_verbose
 
@@ -65,8 +83,7 @@ class Gem::Ext::Builder
         p(command)
       end
       results << "current directory: #{dir}"
-      require "shellwords"
-      results << command.shelljoin
+      results << Shellwords.join(command)
 
       require "open3"
       # Set $SOURCE_DATE_EPOCH for the subprocess.
@@ -131,8 +148,7 @@ class Gem::Ext::Builder
     when /CMakeLists.txt/ then
       Gem::Ext::CmakeBuilder
     when /Cargo.toml/ then
-      # We use the spec name here to ensure we invoke the correct init function later
-      Gem::Ext::CargoBuilder.new(@spec)
+      Gem::Ext::CargoBuilder.new
     else
       build_error("No builder for extension '#{extension}'")
     end

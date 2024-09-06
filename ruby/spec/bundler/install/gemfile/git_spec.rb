@@ -30,6 +30,13 @@ RSpec.describe "bundle install with git sources" do
       expect(Dir["#{default_bundle_path}/cache/bundler/git/foo-1.0-*"]).to have_attributes :size => 1
     end
 
+    it "does not write to cache on bundler/setup" do
+      cache_path = default_bundle_path.join("cache")
+      FileUtils.rm_rf(cache_path)
+      ruby "require 'bundler/setup'"
+      expect(cache_path).not_to exist
+    end
+
     it "caches the git repo globally and properly uses the cached repo on the next invocation" do
       simulate_new_machine
       bundle "config set global_gem_cache true"
@@ -52,8 +59,9 @@ RSpec.describe "bundle install with git sources" do
       bundle "update foo"
 
       sha = git.ref_for("main", 11)
-      spec_file = default_bundle_path.join("bundler/gems/foo-1.0-#{sha}/foo.gemspec").to_s
-      ruby_code = Gem::Specification.load(spec_file).to_ruby
+      spec_file = default_bundle_path.join("bundler/gems/foo-1.0-#{sha}/foo.gemspec")
+      expect(spec_file).to exist
+      ruby_code = Gem::Specification.load(spec_file.to_s).to_ruby
       file_code = File.read(spec_file)
       expect(file_code).to eq(ruby_code)
     end
@@ -192,6 +200,7 @@ RSpec.describe "bundle install with git sources" do
           gem "foo"
         end
       G
+      expect(err).to be_empty
 
       run <<-RUBY
         require 'foo'
@@ -216,6 +225,45 @@ RSpec.describe "bundle install with git sources" do
       RUBY
 
       expect(out).to eq("WIN")
+    end
+
+    it "works when an abbreviated revision is added after an initial, potentially shallow clone" do
+      install_gemfile <<-G
+        source "#{file_uri_for(gem_repo1)}"
+        git "#{lib_path("foo-1.0")}" do
+          gem "foo"
+        end
+      G
+
+      install_gemfile <<-G
+        source "#{file_uri_for(gem_repo1)}"
+        git "#{lib_path("foo-1.0")}", :ref => #{@revision[0..7].inspect} do
+          gem "foo"
+        end
+      G
+    end
+
+    it "works when a tag that does not look like a commit hash is used as the value of :ref" do
+      build_git "foo"
+      @remote = build_git("bar", :bare => true)
+      update_git "foo", :remote => file_uri_for(@remote.path)
+      update_git "foo", :push => "main"
+
+      install_gemfile <<-G
+        source "#{file_uri_for(gem_repo1)}"
+        gem 'foo', :git => "#{@remote.path}"
+      G
+
+      # Create a new tag on the remote that needs fetching
+      update_git "foo", :tag => "v1.0.0"
+      update_git "foo", :push => "v1.0.0"
+
+      install_gemfile <<-G
+        source "#{file_uri_for(gem_repo1)}"
+        gem 'foo', :git => "#{@remote.path}", :ref => "v1.0.0"
+      G
+
+      expect(err).to be_empty
     end
 
     it "works when the revision is a non-head ref" do
@@ -881,7 +929,7 @@ RSpec.describe "bundle install with git sources" do
         gem "has_submodule"
       end
     G
-    expect(err).to match(/could not find gem 'submodule/i)
+    expect(err).to match(%r{submodule >= 0 could not be found in rubygems repository #{file_uri_for(gem_repo1)}/ or installed locally})
 
     expect(the_bundle).not_to include_gems "has_submodule 1.0"
   end
@@ -1103,6 +1151,17 @@ RSpec.describe "bundle install with git sources" do
       G
       expect(err).to include("Revision deadbeef does not exist in the repository")
     end
+
+    it "gives a helpful error message when the remote branch no longer exists" do
+      build_git "foo"
+
+      install_gemfile <<-G, :env => { "LANG" => "en" }, :raise_on_error => false
+        source "#{file_uri_for(gem_repo1)}"
+        gem "foo", :git => "#{file_uri_for(lib_path("foo-1.0"))}", :branch => "deadbeef"
+      G
+
+      expect(err).to include("Revision deadbeef does not exist in the repository")
+    end
   end
 
   describe "bundle install with deployment mode configured and git sources" do
@@ -1220,7 +1279,7 @@ RSpec.describe "bundle install with git sources" do
         s.extensions = ["ext/extconf.rb"]
         s.write "ext/extconf.rb", <<-RUBY
           require "mkmf"
-          $extout = "$(topdir)/" + RbConfig::CONFIG["EXTOUT"] unless RUBY_VERSION < "2.4"
+          $extout = "$(topdir)/" + RbConfig::CONFIG["EXTOUT"]
           create_makefile("foo")
         RUBY
         s.write "ext/foo.c", "void Init_foo() {}"
@@ -1440,8 +1499,6 @@ In Gemfile:
 
   describe "without git installed" do
     it "prints a better error message when installing" do
-      build_git "foo"
-
       gemfile <<-G
         source "#{file_uri_for(gem_repo1)}"
 

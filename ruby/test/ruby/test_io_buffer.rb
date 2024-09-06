@@ -142,6 +142,24 @@ class TestIOBuffer < Test::Unit::TestCase
     assert_equal message, buffer.get_string(0, message.bytesize)
   end
 
+  def test_resize_zero_internal
+    buffer = IO::Buffer.new(1)
+
+    buffer.resize(0)
+    assert_equal 0, buffer.size
+
+    buffer.resize(1)
+    assert_equal 1, buffer.size
+  end
+
+  def test_resize_zero_external
+    buffer = IO::Buffer.for('1')
+
+    assert_raise IO::Buffer::AccessError do
+      buffer.resize(0)
+    end
+  end
+
   def test_compare_same_size
     buffer1 = IO::Buffer.new(1)
     assert_equal buffer1, buffer1
@@ -169,16 +187,26 @@ class TestIOBuffer < Test::Unit::TestCase
     assert_equal("Hello World", buffer.get_string(8, 11))
   end
 
-  def test_slice_bounds
+  def test_slice_arguments
+    buffer = IO::Buffer.for("Hello World")
+
+    slice = buffer.slice
+    assert_equal "Hello World", slice.get_string
+
+    slice = buffer.slice(2)
+    assert_equal("llo World", slice.get_string)
+  end
+
+  def test_slice_bounds_error
     buffer = IO::Buffer.new(128)
 
     assert_raise ArgumentError do
       buffer.slice(128, 10)
     end
 
-    # assert_raise RuntimeError do
-    #   pp buffer.slice(-10, 10)
-    # end
+    assert_raise ArgumentError do
+      buffer.slice(-10, 10)
+    end
   end
 
   def test_locked
@@ -209,6 +237,18 @@ class TestIOBuffer < Test::Unit::TestCase
 
     chunk = buffer.get_string(0, message.bytesize, Encoding::BINARY)
     assert_equal Encoding::BINARY, chunk.encoding
+
+    assert_raise_with_message(ArgumentError, /bigger than the buffer size/) do
+      buffer.get_string(0, 129)
+    end
+
+    assert_raise_with_message(ArgumentError, /bigger than the buffer size/) do
+      buffer.get_string(129)
+    end
+
+    assert_raise_with_message(ArgumentError, /Offset can't be negative/) do
+      buffer.get_string(-1)
+    end
   end
 
   # We check that values are correctly round tripped.
@@ -235,15 +275,57 @@ class TestIOBuffer < Test::Unit::TestCase
     :F64 => [-1.0, 0.0, 0.5, 1.0, 128.0],
   }
 
-  def test_get_set_primitives
+  def test_get_set_value
     buffer = IO::Buffer.new(128)
 
-    RANGES.each do |type, values|
+    RANGES.each do |data_type, values|
       values.each do |value|
-        buffer.set_value(type, 0, value)
-        assert_equal value, buffer.get_value(type, 0), "Converting #{value} as #{type}."
+        buffer.set_value(data_type, 0, value)
+        assert_equal value, buffer.get_value(data_type, 0), "Converting #{value} as #{data_type}."
       end
     end
+  end
+
+  def test_get_set_values
+    buffer = IO::Buffer.new(128)
+
+    RANGES.each do |data_type, values|
+      format = [data_type] * values.size
+
+      buffer.set_values(format, 0, values)
+      assert_equal values, buffer.get_values(format, 0), "Converting #{values} as #{format}."
+    end
+  end
+
+  def test_values
+    buffer = IO::Buffer.new(128)
+
+    RANGES.each do |data_type, values|
+      format = [data_type] * values.size
+
+      buffer.set_values(format, 0, values)
+      assert_equal values, buffer.values(data_type, 0, values.size), "Reading #{values} as #{format}."
+    end
+  end
+
+  def test_each
+    buffer = IO::Buffer.new(128)
+
+    RANGES.each do |data_type, values|
+      format = [data_type] * values.size
+      data_type_size = IO::Buffer.size_of(data_type)
+      values_with_offsets = values.map.with_index{|value, index| [index * data_type_size, value]}
+
+      buffer.set_values(format, 0, values)
+      assert_equal values_with_offsets, buffer.each(data_type, 0, values.size).to_a, "Reading #{values} as #{data_type}."
+    end
+  end
+
+  def test_each_byte
+    string = "The quick brown fox jumped over the lazy dog."
+    buffer = IO::Buffer.for(string)
+
+    assert_equal string.bytes, buffer.each_byte.to_a
   end
 
   def test_clear
@@ -277,17 +359,38 @@ class TestIOBuffer < Test::Unit::TestCase
     input.close
   end
 
-  def test_read
+  def hello_world_tempfile
     io = Tempfile.new
     io.write("Hello World")
     io.seek(0)
 
-    buffer = IO::Buffer.new(128)
-    buffer.read(io, 5)
-
-    assert_equal "Hello", buffer.get_string(0, 5)
+    yield io
   ensure
-    io.close!
+    io&.close!
+  end
+
+  def test_read
+    hello_world_tempfile do |io|
+      buffer = IO::Buffer.new(128)
+      buffer.read(io)
+      assert_equal "Hello", buffer.get_string(0, 5)
+    end
+  end
+
+  def test_read_with_with_length
+    hello_world_tempfile do |io|
+      buffer = IO::Buffer.new(128)
+      buffer.read(io, 5)
+      assert_equal "Hello", buffer.get_string(0, 5)
+    end
+  end
+
+  def test_read_with_with_offset
+    hello_world_tempfile do |io|
+      buffer = IO::Buffer.new(128)
+      buffer.read(io, nil, 6)
+      assert_equal "Hello", buffer.get_string(6, 5)
+    end
   end
 
   def test_write
@@ -295,7 +398,7 @@ class TestIOBuffer < Test::Unit::TestCase
 
     buffer = IO::Buffer.new(128)
     buffer.set_string("Hello")
-    buffer.write(io, 5)
+    buffer.write(io)
 
     io.seek(0)
     assert_equal "Hello", io.read(5)
@@ -309,9 +412,23 @@ class TestIOBuffer < Test::Unit::TestCase
     io.seek(0)
 
     buffer = IO::Buffer.new(128)
-    buffer.pread(io, 5, 6)
+    buffer.pread(io, 6, 5)
 
     assert_equal "World", buffer.get_string(0, 5)
+    assert_equal 0, io.tell
+  ensure
+    io.close!
+  end
+
+  def test_pread_offset
+    io = Tempfile.new
+    io.write("Hello World")
+    io.seek(0)
+
+    buffer = IO::Buffer.new(128)
+    buffer.pread(io, 6, 5, 6)
+
+    assert_equal "World", buffer.get_string(6, 5)
     assert_equal 0, io.tell
   ensure
     io.close!
@@ -322,7 +439,7 @@ class TestIOBuffer < Test::Unit::TestCase
 
     buffer = IO::Buffer.new(128)
     buffer.set_string("World")
-    buffer.pwrite(io, 5, 6)
+    buffer.pwrite(io, 6, 5)
 
     assert_equal 0, io.tell
 
@@ -330,5 +447,55 @@ class TestIOBuffer < Test::Unit::TestCase
     assert_equal "World", io.read(5)
   ensure
     io.close!
+  end
+
+  def test_pwrite_offset
+    io = Tempfile.new
+
+    buffer = IO::Buffer.new(128)
+    buffer.set_string("Hello World")
+    buffer.pwrite(io, 6, 5, 6)
+
+    assert_equal 0, io.tell
+
+    io.seek(6)
+    assert_equal "World", io.read(5)
+  ensure
+    io.close!
+  end
+
+  def test_operators
+    source = IO::Buffer.for("1234123412")
+    mask = IO::Buffer.for("133\x00")
+
+    assert_equal IO::Buffer.for("123\x00123\x0012"), (source & mask)
+    assert_equal IO::Buffer.for("1334133413"), (source | mask)
+    assert_equal IO::Buffer.for("\x00\x01\x004\x00\x01\x004\x00\x01"), (source ^ mask)
+    assert_equal IO::Buffer.for("\xce\xcd\xcc\xcb\xce\xcd\xcc\xcb\xce\xcd"), ~source
+  end
+
+  def test_inplace_operators
+    source = IO::Buffer.for("1234123412")
+    mask = IO::Buffer.for("133\x00")
+
+    assert_equal IO::Buffer.for("123\x00123\x0012"), source.dup.and!(mask)
+    assert_equal IO::Buffer.for("1334133413"), source.dup.or!(mask)
+    assert_equal IO::Buffer.for("\x00\x01\x004\x00\x01\x004\x00\x01"), source.dup.xor!(mask)
+    assert_equal IO::Buffer.for("\xce\xcd\xcc\xcb\xce\xcd\xcc\xcb\xce\xcd"), source.dup.not!
+  end
+
+  def test_shared
+    message = "Hello World"
+    buffer = IO::Buffer.new(64, IO::Buffer::MAPPED | IO::Buffer::SHARED)
+
+    pid = fork do
+      buffer.set_string(message)
+    end
+
+    Process.wait(pid)
+    string = buffer.get_string(0, message.bytesize)
+    assert_equal message, string
+  rescue NotImplementedError
+    omit "Fork/shared memory is not supported."
   end
 end

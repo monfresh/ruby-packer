@@ -359,7 +359,7 @@ RSpec.describe "gemcutter's dependency API" do
     expect(out).to include("Fetching source index from http://localgemserver.test/extra")
   end
 
-  it "does not fetch every spec if the index of gems is large when doing back deps", :bundler => "< 3" do
+  it "does not fetch every spec when doing back deps", :bundler => "< 3" do
     build_repo2 do
       build_gem "back_deps" do |s|
         s.add_dependency "foo"
@@ -369,9 +369,7 @@ RSpec.describe "gemcutter's dependency API" do
       FileUtils.rm_rf Dir[gem_repo2("gems/foo-*.gem")]
     end
 
-    api_request_limit = low_api_request_limit_for(gem_repo2)
-
-    install_gemfile <<-G, :artifice => "endpoint_extra_missing", :requires => [api_request_limit_hack_file], :env => { "BUNDLER_SPEC_API_REQUEST_LIMIT" => api_request_limit.to_s }.merge(env_for_missing_prerelease_default_gem_activation)
+    install_gemfile <<-G, :artifice => "endpoint_extra_missing", :env => env_for_missing_prerelease_default_gem_activation
       source "#{source_uri}"
       source "#{source_uri}/extra"
       gem "back_deps"
@@ -380,7 +378,7 @@ RSpec.describe "gemcutter's dependency API" do
     expect(the_bundle).to include_gems "back_deps 1.0"
   end
 
-  it "does not fetch every spec if the index of gems is large when doing back deps using blocks" do
+  it "does not fetch every spec when doing back deps using blocks" do
     build_repo2 do
       build_gem "back_deps" do |s|
         s.add_dependency "foo"
@@ -390,9 +388,7 @@ RSpec.describe "gemcutter's dependency API" do
       FileUtils.rm_rf Dir[gem_repo2("gems/foo-*.gem")]
     end
 
-    api_request_limit = low_api_request_limit_for(gem_repo2)
-
-    install_gemfile <<-G, :artifice => "endpoint_extra_missing", :requires => [api_request_limit_hack_file], :env => { "BUNDLER_SPEC_API_REQUEST_LIMIT" => api_request_limit.to_s }.merge(env_for_missing_prerelease_default_gem_activation)
+    install_gemfile <<-G, :artifice => "endpoint_extra_missing", :env => env_for_missing_prerelease_default_gem_activation
       source "#{source_uri}"
       source "#{source_uri}/extra" do
         gem "back_deps"
@@ -474,18 +470,6 @@ RSpec.describe "gemcutter's dependency API" do
 
     bundle :install, :artifice => "endpoint", :env => { "BUNDLER_SPEC_GEM_REPO" => gem_repo2.to_s }
     expect(out).to include("Fetching gem metadata from #{source_uri}")
-  end
-
-  it "should install when EndpointSpecification has a bin dir owned by root", :sudo => true do
-    sudo "mkdir -p #{system_gem_path("bin")}"
-    sudo "chown -R root #{system_gem_path("bin")}"
-
-    gemfile <<-G
-      source "#{source_uri}"
-      gem "rails"
-    G
-    bundle :install, :artifice => "endpoint"
-    expect(the_bundle).to include_gems "rails 2.3.2"
   end
 
   it "installs the binstubs", :bundler => "< 3" do

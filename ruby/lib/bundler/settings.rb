@@ -43,7 +43,6 @@ module Bundler
       setup_makes_kernel_gem_public
       silence_deprecations
       silence_root_warning
-      suppress_install_using_messages
       update_requires_all_flag
     ].freeze
 
@@ -219,7 +218,6 @@ module Bundler
     def path
       configs.each do |_level, settings|
         path = value_for("path", settings)
-        path = "vendor/bundle" if value_for("deployment", settings) && path.nil?
         path_system = value_for("path.system", settings)
         disabled_shared_gems = value_for("disable_shared_gems", settings)
         next if path.nil? && path_system.nil? && disabled_shared_gems.nil?
@@ -227,7 +225,9 @@ module Bundler
         return Path.new(path, system_path)
       end
 
-      Path.new(nil, false)
+      path = "vendor/bundle" if self[:deployment]
+
+      Path.new(path, false)
     end
 
     Path = Struct.new(:explicit_path, :system_path) do
@@ -275,12 +275,6 @@ module Bundler
         raise InvalidOption,
           "Using a custom path while using system gems is unsupported.\n#{path.join("\n")}\n#{system_path.join("\n")}\n#{disable_shared_gems.join("\n")}"
       end
-    end
-
-    def allow_sudo?
-      key = key_for(:path)
-      path_configured = @temporary.key?(key) || @local_config.key?(key)
-      !path_configured
     end
 
     def ignore_config?
@@ -501,7 +495,7 @@ module Bundler
         uri = $2
         suffix = $3
       end
-      uri = "#{uri}/" unless uri.end_with?("/")
+      uri = URINormalizer.normalize_suffix(uri)
       require_relative "vendored_uri"
       uri = Bundler::URI(uri)
       unless uri.absolute?

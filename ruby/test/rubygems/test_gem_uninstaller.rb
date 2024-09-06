@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 require_relative "installer_test_case"
 require "rubygems/uninstaller"
 
@@ -172,7 +173,7 @@ class TestGemUninstaller < Gem::InstallerTestCase
 
   def test_remove_plugins
     write_file File.join(@tempdir, "lib", "rubygems_plugin.rb") do |io|
-      io.write "puts __FILE__"
+      io.write "# do nothing"
     end
 
     @spec.files += %w[lib/rubygems_plugin.rb]
@@ -189,7 +190,7 @@ class TestGemUninstaller < Gem::InstallerTestCase
 
   def test_remove_plugins_with_install_dir
     write_file File.join(@tempdir, "lib", "rubygems_plugin.rb") do |io|
-      io.write "puts __FILE__"
+      io.write "# do nothing"
     end
 
     @spec.files += %w[lib/rubygems_plugin.rb]
@@ -207,7 +208,7 @@ class TestGemUninstaller < Gem::InstallerTestCase
 
   def test_regenerate_plugins_for
     write_file File.join(@tempdir, "lib", "rubygems_plugin.rb") do |io|
-      io.write "puts __FILE__"
+      io.write "# do nothing"
     end
 
     @spec.files += %w[lib/rubygems_plugin.rb]
@@ -372,7 +373,7 @@ create_makefile '#{@spec.name}'
     @user_spec = Gem::Specification.find_by_name "b"
 
     uninstaller = Gem::Uninstaller.new(@user_spec.name,
-                                       :executables  => true,
+                                       :executables => true,
                                        :user_install => true)
 
     gem_dir = File.join @user_spec.gem_dir
@@ -634,7 +635,7 @@ create_makefile '#{@spec.name}'
 
   def test_uninstall_keeps_plugins_up_to_date
     write_file File.join(@tempdir, "lib", "rubygems_plugin.rb") do |io|
-      io.write "puts __FILE__"
+      io.write "# do nothing"
     end
 
     plugin_path = File.join Gem.plugindir, "a_plugin.rb"

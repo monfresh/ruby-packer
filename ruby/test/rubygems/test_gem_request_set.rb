@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 require_relative "helper"
 require "rubygems/request_set"
 
@@ -110,7 +111,7 @@ Gems to install:
     end
 
     options = {
-      :gemdeps     => "gem.deps.rb",
+      :gemdeps => "gem.deps.rb",
       :install_dir => "#{@gemhome}2",
     }
 
@@ -575,7 +576,7 @@ ruby "0"
     rs.resolve
 
     options = {
-      :development         => true,
+      :development => true,
       :development_shallow => true,
     }
 

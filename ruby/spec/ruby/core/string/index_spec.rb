@@ -159,6 +159,14 @@ describe "String#index with String" do
       "あれ".index char
     end.should raise_error(Encoding::CompatibilityError)
   end
+
+  it "handles a substring in a superset encoding" do
+    'abc'.force_encoding(Encoding::US_ASCII).index('é').should == nil
+  end
+
+  it "handles a substring in a subset encoding" do
+    'été'.index('t'.force_encoding(Encoding::US_ASCII)).should == 1
+  end
 end
 
 describe "String#index with Regexp" do
@@ -214,6 +222,17 @@ describe "String#index with Regexp" do
 
     'hello.'.index(/not/)
     $~.should == nil
+  end
+
+  ruby_bug "#20421", ""..."3.2" do
+    it "always clear $~" do
+      "a".index(/a/)
+      $~.should_not == nil
+
+      string = "blablabla"
+      string.index(/bla/, string.length + 1)
+      $~.should == nil
+    end
   end
 
   it "starts the search at the given offset" do

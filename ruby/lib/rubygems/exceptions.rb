@@ -214,6 +214,16 @@ class Gem::RubyVersionMismatch < Gem::Exception; end
 class Gem::VerificationError < Gem::Exception; end
 
 ##
+# Raised by Gem::WebauthnListener when an error occurs during security
+# device verification.
+
+class Gem::WebauthnVerificationError < Gem::Exception
+  def initialize(message)
+    super "Security device verification failed: #{message}"
+  end
+end
+
+##
 # Raised to indicate that a system exit should occur with the specified
 # exit_code
 
@@ -221,14 +231,12 @@ class Gem::SystemExitException < SystemExit
   ##
   # The exit code for the process
 
-  attr_accessor :exit_code
+  alias exit_code status
 
   ##
   # Creates a new SystemExitException with the given +exit_code+
 
   def initialize(exit_code)
-    @exit_code = exit_code
-
     super exit_code, "Exiting RubyGems with exit_code #{exit_code}"
   end
 end

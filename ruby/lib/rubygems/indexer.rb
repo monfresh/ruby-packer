@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 require_relative "../rubygems"
 require_relative "package"
 require "tmpdir"
@@ -397,7 +398,7 @@ class Gem::Indexer
       dst_name = File.join @dest_directory, file # REFACTOR: duped above
 
       FileUtils.mv src_name, dst_name, :verbose => verbose,
-                   :force => true
+                                       :force => true
 
       File.utime newest_mtime, newest_mtime, dst_name
     end

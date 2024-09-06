@@ -100,7 +100,7 @@ class Compiler
     log "- options: #{@options}"
     log
 
-    @ldflags = ''
+    @ldflags = '-L/opt/homebrew/opt/bison/lib'
     @cflags = if Gem.win_platform?
                 if @options[:debug]
                   ' -MD /DEBUG:FULL /Od -Zi '
@@ -111,7 +111,7 @@ class Compiler
                 ' -DRUBY_DEBUG -fPIC -g -O0 -pipe '
               else
                 #' -DRUBY_DEBUG -fPIC -O3 -fno-fast-math -ggdb3 -Os -fdata-sections -ffunction-sections -pipe -Wno-error=implicit-function-declaration '
-                ' -fPIC -O3 -fno-fast-math -Os -fdata-sections -ffunction-sections -pipe '
+                ' -fPIC '
               end
 
     # install prefix for stuffed libraries
@@ -189,11 +189,11 @@ class Compiler
     copy_ruby_source unless Dir.exist?(@ruby_source_dir)
     stuff_zlib
     stuff_openssl
-    stuff_gdbm
+    #stuff_gdbm
     stuff_yaml
-    stuff_libffi
-    stuff_ncurses
-    stuff_readline
+    #stuff_libffi
+    #stuff_ncurses
+    #stuff_readline
     prepare_pass1_flags
     patch_common_mk
     patch_win32_makefile_sub if Gem.win_platform?
@@ -261,7 +261,6 @@ class Compiler
       end
       @utils.run(compile_pass1_env,
                  @ruby_configure,
-                 '-C',
                  '--prefix', @ruby_install,
                  '--enable-bundled-libyaml',
                  '--without-gmp',
@@ -375,12 +374,12 @@ class Compiler
       end
       @utils.run(compile_pass2_env,
                  @ruby_configure,
-                 '-C',
                  "--with-baseruby=#{File.join(@ruby_install_bin, 'ruby')}",
                  '--enable-bundled-libyaml',
                  '--without-gmp',
                  '--disable-dtrace',
                  '--enable-debug-env',
+                 '--disable-install-doc',
                  '--disable-install-rdoc',
                  '--with-static-linked-ext')
       @utils.run(compile_pass2_env, "make #{@options[:make_args]}")

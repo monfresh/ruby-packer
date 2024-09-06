@@ -340,19 +340,6 @@ RSpec.describe "Bundler.setup" do
         expect(out).to eq("WIN")
       end
 
-      it "version_requirement is now deprecated in rubygems 1.4.0+ when gem is missing" do
-        run <<-R
-          begin
-            gem "activesupport"
-            puts "FAIL"
-          rescue LoadError
-            puts "WIN"
-          end
-        R
-
-        expect(err).to be_empty
-      end
-
       it "replaces #gem but raises when the version is wrong" do
         run <<-R
           begin
@@ -364,19 +351,6 @@ RSpec.describe "Bundler.setup" do
         R
 
         expect(out).to eq("WIN")
-      end
-
-      it "version_requirement is now deprecated in rubygems 1.4.0+ when the version is wrong" do
-        run <<-R
-          begin
-            gem "rack", "1.0.0"
-            puts "FAIL"
-          rescue LoadError
-            puts "WIN"
-          end
-        R
-
-        expect(err).to be_empty
       end
     end
 
@@ -396,7 +370,7 @@ RSpec.describe "Bundler.setup" do
 
       context "when the ruby stdlib is a substring of Gem.path" do
         it "does not reject the stdlib from $LOAD_PATH" do
-          substring = "/" + $LOAD_PATH.find {|p| p =~ /vendor_ruby/ }.split("/")[2]
+          substring = "/" + $LOAD_PATH.find {|p| p.include?("vendor_ruby") }.split("/")[2]
           run "puts 'worked!'", :env => { "GEM_PATH" => substring }
           expect(out).to eq("worked!")
         end
@@ -582,12 +556,12 @@ RSpec.describe "Bundler.setup" do
 
       gemfile <<-G
         source "#{file_uri_for(gem_repo1)}"
-        gem "rack", :git => "#{lib_path("rack-0.8")}", :ref => "main", :branch => "nonexistant"
+        gem "rack", :git => "#{lib_path("rack-0.8")}", :ref => "main", :branch => "nonexistent"
       G
 
       bundle %(config set local.rack #{lib_path("local-rack")})
       run "require 'rack'", :raise_on_error => false
-      expect(err).to match(/is using branch main but Gemfile specifies nonexistant/)
+      expect(err).to match(/is using branch main but Gemfile specifies nonexistent/)
     end
   end
 
@@ -661,6 +635,16 @@ RSpec.describe "Bundler.setup" do
       ruby "require '#{system_gem_path("gems/bundler-9.99.9.beta1/lib/bundler.rb")}'; Bundler.setup", :env => { "DEBUG" => "1" }
       expect(out).to include("Found no changes, using resolution from the lockfile")
       expect(out).not_to include("lockfile does not have all gems needed for the current platform")
+      expect(err).to be_empty
+    end
+
+    it "doesn't fail in frozen mode when bundler is a Gemfile dependency" do
+      install_gemfile <<~G
+        source "#{file_uri_for(gem_repo4)}"
+        gem "bundler"
+      G
+
+      bundle "install --verbose", :env => { "BUNDLE_FROZEN" => "true" }
       expect(err).to be_empty
     end
 
@@ -891,7 +875,7 @@ end
 
       gemspec_content = File.binread(gemspec).
                 sub("Bundler::VERSION", %("#{Bundler::VERSION}")).
-                lines.reject {|line| line =~ %r{lib/bundler/version} }.join
+                lines.reject {|line| line.include?("lib/bundler/version") }.join
 
       File.open(File.join(specifications_dir, "#{full_name}.gemspec"), "wb") do |f|
         f.write(gemspec_content)
@@ -1330,17 +1314,14 @@ end
 
     describe "default gem activation" do
       let(:exemptions) do
-        exempts = if Gem.rubygems_version >= Gem::Version.new("2.7")
-          %w[did_you_mean]
-        else
-          %w[io-console openssl]
-        end << "bundler"
+        exempts = %w[did_you_mean bundler]
         exempts << "uri" if Gem.ruby_version >= Gem::Version.new("2.7")
         exempts << "pathname" if Gem.ruby_version >= Gem::Version.new("3.0")
         exempts << "set" unless Gem.rubygems_version >= Gem::Version.new("3.2.6")
         exempts << "tsort" unless Gem.rubygems_version >= Gem::Version.new("3.2.31")
         exempts << "error_highlight" # added in Ruby 3.1 as a default gem
         exempts << "ruby2_keywords" # added in Ruby 3.1 as a default gem
+        exempts << "syntax_suggest" # added in Ruby 3.2 as a default gem
         exempts
       end
 
@@ -1547,5 +1528,30 @@ end
 
       expect(err).to be_empty
     end
+  end
+
+  it "does not undo the Kernel.require decorations", :rubygems => ">= 3.4.6" do
+    install_gemfile "source \"#{file_uri_for(gem_repo1)}\""
+    script = bundled_app("bin/script")
+    create_file(script, <<~RUBY)
+      module Kernel
+        module_function
+
+        alias_method :require_before_extra_monkeypatches, :require
+
+        def require(path)
+          puts "requiring \#{path} used the monkeypatch"
+
+          require_before_extra_monkeypatches(path)
+        end
+      end
+
+      require "bundler/setup"
+
+      require "foo"
+    RUBY
+
+    sys_exec "#{Gem.ruby} #{script}", :raise_on_error => false
+    expect(out).to include("requiring foo used the monkeypatch")
   end
 end

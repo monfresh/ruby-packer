@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 #--
 # Copyright 2006 by Chad Fowler, Rich Kilmer, Jim Weirich and others.
 # All rights reserved.
@@ -26,7 +27,7 @@ class Gem::Validator
     Find.find gem_directory do |file_name|
       fn = file_name[gem_directory.size..file_name.size - 1].sub(/^\//, "")
       installed_files << fn unless
-        fn =~ /CVS/ || fn.empty? || File.directory?(file_name)
+        fn.empty? || fn.include?("CVS") || File.directory?(file_name)
     end
 
     installed_files

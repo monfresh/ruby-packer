@@ -304,6 +304,20 @@ class TestHash < Test::Unit::TestCase
     assert_equal before, ObjectSpace.count_objects[:T_STRING]
   end
 
+  def test_AREF_fstring_key_default_proc
+    assert_separately([], "#{<<~"begin;"}\n#{<<~'end;'}")
+    begin;
+      h = Hash.new do |h, k|
+        k.frozen?
+      end
+
+      str = "foo"
+      refute str.frozen? # assumes this file is frozen_string_literal: false
+      refute h[str]
+      refute h["foo"]
+    end;
+  end
+
   def test_ASET_fstring_key
     a, b = {}, {}
     assert_equal 1, a["abc"] = 1
@@ -1048,14 +1062,14 @@ class TestHash < Test::Unit::TestCase
     h = @cls.new {|hh, k| :foo }
     h[1] = 2
     assert_equal([1, 2], h.shift)
-    assert_equal(:foo, h.shift)
-    assert_equal(:foo, h.shift)
+    assert_nil(h.shift)
+    assert_nil(h.shift)
 
     h = @cls.new(:foo)
     h[1] = 2
     assert_equal([1, 2], h.shift)
-    assert_equal(:foo, h.shift)
-    assert_equal(:foo, h.shift)
+    assert_nil(h.shift)
+    assert_nil(h.shift)
 
     h =@cls[1=>2]
     h.each { assert_equal([1, 2], h.shift) }
@@ -1066,7 +1080,7 @@ class TestHash < Test::Unit::TestCase
     def h.default(k = nil)
       super.upcase
     end
-    assert_equal("FOO", h.shift)
+    assert_nil(h.shift)
   end
 
   def test_shift_for_empty_hash
@@ -1383,6 +1397,15 @@ class TestHash < Test::Unit::TestCase
     assert_equal(@cls[a: 10, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7, h: 8, i: 9, j: 10], h)
   end
 
+  def test_update_on_identhash
+    key = +'a'
+    i = @cls[].compare_by_identity
+    i[key] = 0
+    h = @cls[].update(i)
+    key.upcase!
+    assert_equal(0, h.fetch('a'))
+  end
+
   def test_merge
     h1 = @cls[1=>2, 3=>4]
     h2 = {1=>3, 5=>7}
@@ -1405,10 +1428,10 @@ class TestHash < Test::Unit::TestCase
     expected[7] = 8
     h2 = h.merge(7=>8)
     assert_equal(expected, h2)
-    assert_equal(true, h2.compare_by_identity?)
+    assert_predicate(h2, :compare_by_identity?)
     h2 = h.merge({})
     assert_equal(h, h2)
-    assert_equal(true, h2.compare_by_identity?)
+    assert_predicate(h2, :compare_by_identity?)
 
     h = @cls[]
     h.compare_by_identity
@@ -1416,10 +1439,10 @@ class TestHash < Test::Unit::TestCase
     h1.compare_by_identity
     h2 = h.merge(7=>8)
     assert_equal(h1, h2)
-    assert_equal(true, h2.compare_by_identity?)
+    assert_predicate(h2, :compare_by_identity?)
     h2 = h.merge({})
     assert_equal(h, h2)
-    assert_equal(true, h2.compare_by_identity?)
+    assert_predicate(h2, :compare_by_identity?)
   end
 
   def test_merge!
@@ -1540,6 +1563,17 @@ class TestHash < Test::Unit::TestCase
         c.call
       end
     end
+  end
+
+  def hash_iter_recursion(h, level)
+    return if level == 0
+    h.each_key {}
+    h.each_value { hash_iter_recursion(h, level - 1) }
+  end
+
+  def test_iterlevel_in_ivar_bug19589
+    h = { a: nil }
+    hash_iter_recursion(h, 200)
   end
 
   def test_threaded_iter_level
@@ -1731,6 +1765,15 @@ class TestHash < Test::Unit::TestCase
     EOS
 
     assert_no_memory_leak([], prepare, code, bug9187)
+  end
+
+  def test_memory_size_after_delete
+    require 'objspace'
+    h = {}
+    1000.times {|i| h[i] = true}
+    big = ObjectSpace.memsize_of(h)
+    1000.times {|i| h.delete(i)}
+    assert_operator ObjectSpace.memsize_of(h), :<, big/10
   end
 
   def test_wrapper
@@ -2166,6 +2209,27 @@ class TestHash < Test::Unit::TestCase
     end
   end
 
+  # Previously this test would fail because rb_hash inside opt_aref would look
+  # at the current method name
+  def test_hash_recursion_independent_of_mid
+    o = Class.new do
+      def hash(h, k)
+        h[k]
+      end
+
+      def any_other_name(h, k)
+        h[k]
+      end
+    end.new
+
+    rec = []; rec << rec
+
+    h = @cls[]
+    h[rec] = 1
+    assert o.hash(h, rec)
+    assert o.any_other_name(h, rec)
+  end
+
   def test_any_hash_fixable
     20.times do
       assert_separately([], "#{<<~"begin;"}\n#{<<~'end;'}")
@@ -2190,5 +2254,25 @@ class TestHash < Test::Unit::TestCase
         end
       end;
     end
+  end
+
+  def test_ar_hash_to_st_hash
+    assert_normal_exit("#{<<~"begin;"}\n#{<<~'end;'}", 'https://bugs.ruby-lang.org/issues/20050#note-5')
+    begin;
+      srand(0)
+      class Foo
+        def to_a
+          []
+        end
+        def hash
+          $h.delete($h.keys.sample) if rand < 0.1
+          to_a.hash
+        end
+      end
+      1000.times do
+        $h = {}
+        (0..10).each {|i| $h[Foo.new] ||= {} }
+      end
+    end;
   end
 end

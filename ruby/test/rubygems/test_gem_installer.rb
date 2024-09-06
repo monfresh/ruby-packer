@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 require_relative "installer_test_case"
 
 class TestGemInstaller < Gem::InstallerTestCase
@@ -766,7 +767,7 @@ gem 'other', version
   def test_generate_plugins
     installer = util_setup_installer do |spec|
       write_file File.join(@tempdir, "lib", "rubygems_plugin.rb") do |io|
-        io.write "puts __FILE__"
+        io.write "# do nothing"
       end
 
       spec.files += %w[lib/rubygems_plugin.rb]
@@ -853,11 +854,59 @@ gem 'other', version
     refute_includes File.read(build_root_path), build_root
   end
 
+  class << self
+    attr_accessor :plugin_loaded
+    attr_accessor :post_install_is_called
+  end
+
+  def test_use_plugin_immediately
+    self.class.plugin_loaded = false
+    self.class.post_install_is_called = false
+    spec_version = nil
+    plugin_path = nil
+    installer = util_setup_installer do |spec|
+      spec_version = spec.version
+      plugin_path = File.join("lib", "rubygems_plugin.rb")
+      write_file File.join(@tempdir, plugin_path) do |io|
+        io.write <<-PLUGIN
+#{self.class}.plugin_loaded = true
+Gem.post_install do
+  #{self.class}.post_install_is_called = true
+end
+        PLUGIN
+      end
+      spec.files += [plugin_path]
+      plugin_path = File.join(spec.gem_dir, plugin_path)
+    end
+    build_rake_in do
+      installer.install
+    end
+    assert self.class.plugin_loaded, "plugin is not loaded"
+    assert self.class.post_install_is_called,
+           "post install hook registered by plugin is not called"
+
+    self.class.plugin_loaded = false
+    $LOADED_FEATURES.delete(plugin_path)
+    installer_new = util_setup_installer do |spec_new|
+      spec_new.version = spec_version.version.succ
+      plugin_path = File.join("lib", "rubygems_plugin.rb")
+      write_file File.join(@tempdir, plugin_path) do |io|
+        io.write "#{self.class}.plugin_loaded = true"
+      end
+      spec_new.files += [plugin_path]
+    end
+    build_rake_in do
+      installer_new.install
+    end
+    assert !self.class.plugin_loaded,
+           "plugin is loaded even when old version is already loaded"
+  end
+
   def test_keeps_plugins_up_to_date
     # NOTE: version a-2 is already installed by setup hooks
 
     write_file File.join(@tempdir, "lib", "rubygems_plugin.rb") do |io|
-      io.write "puts __FILE__"
+      io.write "# do nothing"
     end
 
     build_rake_in do
@@ -1493,7 +1542,7 @@ gem 'other', version
 
   def test_install_extension_and_script
     pend "Makefile creation crashes on jruby" if Gem.java_platform?
-    pend if /mswin/ =~ RUBY_PLATFORM && ENV.key?("GITHUB_ACTIONS") # not working from the beginning
+    pend "terminates on mswin" if vc_windows? && ruby_repo?
 
     @spec = setup_base_spec
     @spec.extensions << "extconf.rb"
@@ -1559,7 +1608,7 @@ gem 'other', version
         write_file File.join(@tempdir, file)
       end
 
-      so = File.join(@spec.gem_dir, "#{@spec.name}.#{RbConfig::CONFIG["DLEXT"]}")
+      so = File.join(@spec.extension_dir, "#{@spec.name}.#{RbConfig::CONFIG["DLEXT"]}")
       assert_path_not_exist so
       use_ui @ui do
         path = Gem::Package.build @spec
@@ -1582,6 +1631,41 @@ gem 'other', version
 
       raise
     end
+  end
+
+  def test_install_extension_clean_intermediate_files
+    pend "extensions don't quite work on jruby" if Gem.java_platform?
+    @spec = setup_base_spec
+    @spec.require_paths = ["."]
+    @spec.extensions << "extconf.rb"
+
+    File.write File.join(@tempdir, "extconf.rb"), <<-RUBY
+      require "mkmf"
+      CONFIG['CC'] = '$(TOUCH) $@ ||'
+      CONFIG['LDSHARED'] = '$(TOUCH) $@ ||'
+      $ruby = '#{Gem.ruby}'
+      create_makefile("#{@spec.name}")
+    RUBY
+
+    # empty depend file for no auto dependencies
+    @spec.files += %W[depend #{@spec.name}.c].each do |file|
+      write_file File.join(@tempdir, file)
+    end
+
+    shared_object = "#{@spec.name}.#{RbConfig::CONFIG["DLEXT"]}"
+    extension_file = File.join @spec.extension_dir, shared_object
+    intermediate_file = File.join @spec.gem_dir, shared_object
+
+    assert_path_not_exist extension_file, "no before installing"
+    use_ui @ui do
+      path = Gem::Package.build @spec
+
+      installer = Gem::Installer.at path
+      installer.install
+    end
+
+    assert_path_exist extension_file, "installed"
+    assert_path_not_exist intermediate_file
   end
 
   def test_installation_satisfies_dependency_eh
@@ -1793,7 +1877,7 @@ gem 'other', version
 
     installer = Gem::Installer.at(
       gem_with_ill_formated_platform,
-      :install_dir => @gem_home,
+      :install_dir => @gemhome,
       :user_install => false,
       :force => true
     )
@@ -2220,6 +2304,37 @@ gem 'other', version
     @spec.files = []
 
     assert_equal @spec, eval(File.read(@spec.spec_file))
+  end
+
+  def test_leaves_no_empty_cached_spec_when_no_more_disk_space
+    @spec = setup_base_spec
+    FileUtils.rm @spec.spec_file
+    assert_path_not_exist @spec.spec_file
+
+    @spec.files = %w[a.rb b.rb c.rb]
+
+    installer = Gem::Installer.for_spec @spec
+    installer.gem_home = @gemhome
+
+    File.class_eval do
+      alias_method :original_write, :write
+
+      def write(data)
+        raise Errno::ENOSPC
+      end
+    end
+
+    assert_raise Errno::ENOSPC do
+      installer.write_spec
+    end
+
+    assert_path_not_exist @spec.spec_file
+  ensure
+    File.class_eval do
+      remove_method :write
+      alias_method :write, :original_write # rubocop:disable Lint/DuplicateMethods
+      remove_method :original_write
+    end
   end
 
   def test_dir

@@ -124,22 +124,18 @@ File.foreach "config.status" do |line|
       if universal
         platform = val.sub(/universal/, %q[#{arch && universal[/(?:\A|\s)#{Regexp.quote(arch)}=(\S+)/, 1] || RUBY_PLATFORM[/\A[^-]*/]}])
       end
+    when /^target_cpu$/
+      if universal
+        val = 'arch'
+      end
+    when /^target$/
+      val = '"$(target_cpu)-$(target_vendor)-$(target_os)"'
+    when /^host(?:_(?:os|vendor|cpu|alias))?$/
+      val = %["$(#{name.sub(/^host/, 'target')})"]
     when /^includedir$/
       val = '"$(SDKROOT)"'+val if /darwin/ =~ arch
     end
     v = "  CONFIG[\"#{name}\"] #{eq} #{val}\n"
-
-    # --------- [Enclose.IO Hack start] ---------
-    if ENV['ENCLOSE_IO_RUBYC_2ND_PASS']
-      [
-        "  CONFIG[\"prefix\"] #{eq} ",
-        "  CONFIG[\"RUBY_EXEC_PREFIX\"] #{eq} "
-      ].each do |v_head_comp|
-        v = "#{v[0...(v_head_comp.length)]}'/__enclose_io_memfs__'\n" if v_head_comp == v[0...(v_head_comp.length)]
-      end
-    end
-    # --------- [Enclose.IO Hack end] ---------
-
     if fast[name]
       v_fast << v
     else
@@ -280,7 +276,7 @@ EOS
 print <<EOS if $unicode_emoji_version
   CONFIG["UNICODE_EMOJI_VERSION"] = #{$unicode_emoji_version.dump}
 EOS
-print <<EOS if /darwin/ =~ arch
+print prefix.start_with?("/System/") ? <<EOS : <<EOS if /darwin/ =~ arch
   if sdkroot = ENV["SDKROOT"]
     sdkroot = sdkroot.dup
   elsif File.exist?(File.join(CONFIG["prefix"], "include")) ||
@@ -290,6 +286,8 @@ print <<EOS if /darwin/ =~ arch
     sdkroot.chomp!
   end
   CONFIG["SDKROOT"] = sdkroot
+EOS
+  CONFIG["SDKROOT"] = ""
 EOS
 print <<EOS
   CONFIG["platform"] = #{platform || '"$(arch)"'}
@@ -352,7 +350,6 @@ print <<EOS
     RbConfig::expand(val)
   end
 
-  # :nodoc:
   # call-seq:
   #
   #   RbConfig.fire_update!(key, val)               -> array
@@ -368,7 +365,7 @@ print <<EOS
   #   RbConfig::CONFIG.values_at("CC", "LDSHARED")          # => ["gcc-8", "gcc-8 -shared"]
   #
   # returns updated keys list, or +nil+ if nothing changed.
-  def RbConfig.fire_update!(key, val, mkconf = MAKEFILE_CONFIG, conf = CONFIG)
+  def RbConfig.fire_update!(key, val, mkconf = MAKEFILE_CONFIG, conf = CONFIG) # :nodoc:
     return if mkconf[key] == val
     mkconf[key] = val
     keys = [key]

@@ -6,11 +6,27 @@ require 'tmpdir'
 
 class TestRequire < Test::Unit::TestCase
   def test_load_error_path
-    filename = "should_not_exist"
-    error = assert_raise(LoadError) do
-      require filename
-    end
-    assert_equal filename, error.path
+    Tempfile.create(["should_not_exist", ".rb"]) {|t|
+      filename = t.path
+      t.close
+      File.unlink(filename)
+
+      error = assert_raise(LoadError) do
+        require filename
+      end
+      assert_equal filename, error.path
+
+      # with --disable=gems
+      assert_separately(["-", filename], "#{<<~"begin;"}\n#{<<~'end;'}")
+      begin;
+        filename = ARGV[0]
+        path = Struct.new(:to_path).new(filename)
+        error = assert_raise(LoadError) do
+          require path
+        end
+        assert_equal filename, error.path
+      end;
+    }
   end
 
   def test_require_invalid_shared_object
@@ -52,7 +68,8 @@ class TestRequire < Test::Unit::TestCase
   def test_require_nonascii
     bug3758 = '[ruby-core:31915]'
     ["\u{221e}", "\x82\xa0".force_encoding("cp932")].each do |path|
-      assert_raise_with_message(LoadError, /#{path}\z/, bug3758) {require path}
+      e = assert_raise(LoadError, bug3758) {require path}
+      assert_operator(e.message, :end_with?, path, bug3758)
     end
   end
 
@@ -93,7 +110,7 @@ class TestRequire < Test::Unit::TestCase
       begin
         require_path = File.join(tmp, dir, 'foo.rb').encode(encoding)
       rescue
-        skip "cannot convert path encoding to #{encoding}"
+        omit "cannot convert path encoding to #{encoding}"
       end
       Dir.mkdir(File.dirname(require_path))
       open(require_path, "wb") {|f| f.puts '$:.push __FILE__'}
@@ -175,7 +192,7 @@ class TestRequire < Test::Unit::TestCase
       t.close
 
       path = File.expand_path(t.path).sub(/\A(\w):/, '//127.0.0.1/\1$')
-      skip "local drive #$1: is not shared" unless File.exist?(path)
+      omit "local drive #$1: is not shared" unless File.exist?(path)
       args = ['--disable-gems', "-I#{File.dirname(path)}"]
       assert_in_out_err(args, "#{<<~"END;"}", [path], [])
       begin
@@ -352,6 +369,26 @@ class TestRequire < Test::Unit::TestCase
     end
   end
 
+  def test_public_in_wrapped_load
+    Tempfile.create(["test_public_in_wrapped_load", ".rb"]) do |t|
+      t.puts "def foo; end", "public :foo"
+      t.close
+      assert_warning(/main\.public/) do
+        assert load(t.path, true)
+      end
+    end
+  end
+
+  def test_private_in_wrapped_load
+    Tempfile.create(["test_private_in_wrapped_load", ".rb"]) do |t|
+      t.puts "def foo; end", "private :foo"
+      t.close
+      assert_warning(/main\.private/) do
+        assert load(t.path, true)
+      end
+    end
+  end
+
   def test_load_scope
     bug1982 = '[ruby-core:25039] [Bug #1982]'
     Tempfile.create(["test_ruby_test_require", ".rb"]) {|t|
@@ -460,7 +497,7 @@ class TestRequire < Test::Unit::TestCase
           result = IO.popen([EnvUtil.rubybin, "b/tst.rb"], &:read)
           assert_equal("a/lib.rb\n", result, "[ruby-dev:40040]")
         rescue NotImplementedError, Errno::EACCES
-          skip "File.symlink is not implemented"
+          omit "File.symlink is not implemented"
         end
       }
     }
@@ -486,7 +523,7 @@ class TestRequire < Test::Unit::TestCase
           result = IO.popen([EnvUtil.rubybin, "c.rb"], &:read)
           assert_equal("1", result, "bug17885 [ruby-core:104010]")
         rescue NotImplementedError, Errno::EACCES
-          skip "File.symlink is not implemented"
+          omit "File.symlink is not implemented"
         end
       }
     }
@@ -562,9 +599,6 @@ class TestRequire < Test::Unit::TestCase
 
       assert_equal(true, (t1_res ^ t2_res), bug5754 + " t1:#{t1_res} t2:#{t2_res}")
       assert_equal([:pre, :post], scratch, bug5754)
-
-      assert_match(/circular require/, output)
-      assert_match(/in #{__method__}'$/o, output)
     }
   ensure
     $VERBOSE = verbose
@@ -824,6 +858,8 @@ class TestRequire < Test::Unit::TestCase
   end if File.respond_to?(:mkfifo)
 
   def test_loading_fifo_threading_success
+    omit "[Bug #18613]" if /freebsd/=~ RUBY_PLATFORM
+
     Tempfile.create(%w'fifo .rb') {|f|
       f.close
       File.unlink(f.path)
@@ -850,7 +886,7 @@ class TestRequire < Test::Unit::TestCase
   end if File.respond_to?(:mkfifo)
 
   def test_loading_fifo_fd_leak
-    skip if RUBY_PLATFORM =~ /android/ # https://rubyci.org/logs/rubyci.s3.amazonaws.com/android29-x86_64/ruby-master/log/20200419T124100Z.fail.html.gz
+    omit if RUBY_PLATFORM =~ /android/ # https://rubyci.org/logs/rubyci.s3.amazonaws.com/android29-x86_64/ruby-master/log/20200419T124100Z.fail.html.gz
 
     Tempfile.create(%w'fifo .rb') {|f|
       f.close
@@ -911,7 +947,7 @@ class TestRequire < Test::Unit::TestCase
       begin
         File.symlink "real", File.join(tmp, "symlink")
       rescue NotImplementedError, Errno::EACCES
-        skip "File.symlink is not implemented"
+        omit "File.symlink is not implemented"
       end
       File.write(File.join(tmp, "real/test_symlink_load_path.rb"), "print __FILE__")
       result = IO.popen([EnvUtil.rubybin, "-I#{tmp}/symlink", "-e", "require 'test_symlink_load_path.rb'"], &:read)
@@ -958,5 +994,20 @@ class TestRequire < Test::Unit::TestCase
     def test_resolve_feature_path_with_missing_feature
       assert_nil($LOAD_PATH.resolve_feature_path("superkalifragilisticoespialidoso"))
     end
+  end
+
+  def test_require_with_public_method_missing
+    # [Bug #19793]
+    assert_separately(["-W0", "--disable-gems", "-rtempfile"], __FILE__, __LINE__, <<~RUBY)
+      GC.stress = true
+
+      class Object
+        public :method_missing
+      end
+
+      Tempfile.create(["empty", ".rb"]) do |file|
+        require file.path
+      end
+    RUBY
   end
 end

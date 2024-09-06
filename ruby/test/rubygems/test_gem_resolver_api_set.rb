@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 require_relative "helper"
 
 class TestGemResolverAPISet < Gem::TestCase
@@ -36,9 +37,9 @@ class TestGemResolverAPISet < Gem::TestCase
     spec_fetcher
 
     data = [
-      { :name         => "a",
-        :number       => "1",
-        :platform     => "ruby",
+      { :name => "a",
+        :number => "1",
+        :platform => "ruby",
         :dependencies => [] },
     ]
 
@@ -59,13 +60,13 @@ class TestGemResolverAPISet < Gem::TestCase
     spec_fetcher
 
     data = [
-      { :name         => "a",
-        :number       => "1",
-        :platform     => "ruby",
+      { :name => "a",
+        :number => "1",
+        :platform => "ruby",
         :dependencies => [] },
-      { :name         => "a",
-        :number       => "2.a",
-        :platform     => "ruby",
+      { :name => "a",
+        :number => "2.a",
+        :platform => "ruby",
         :dependencies => [] },
     ]
 
@@ -88,9 +89,9 @@ class TestGemResolverAPISet < Gem::TestCase
     spec_fetcher
 
     data = [
-      { :name         => "a",
-        :number       => "1",
-        :platform     => "ruby",
+      { :name => "a",
+        :number => "1",
+        :platform => "ruby",
         :dependencies => [] },
     ]
 
