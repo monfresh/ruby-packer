@@ -261,6 +261,7 @@ class Compiler
       end
       @utils.run(compile_pass1_env,
                  @ruby_configure,
+                 '-C',
                  '--prefix', @ruby_install,
                  '--enable-bundled-libyaml',
                  '--without-gmp',
@@ -374,6 +375,7 @@ class Compiler
       end
       @utils.run(compile_pass2_env,
                  @ruby_configure,
+                 '-C',
                  "--with-baseruby=#{File.join(@ruby_install_bin, 'ruby')}",
                  '--enable-bundled-libyaml',
                  '--without-gmp',
