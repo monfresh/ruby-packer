@@ -48,7 +48,7 @@ DEPENDENCIES
   rake
 
 RUBY VERSION
-   ruby 3.1.3p185
+   ruby 3.2.5p208
 
 BUNDLED WITH
    2.3.26

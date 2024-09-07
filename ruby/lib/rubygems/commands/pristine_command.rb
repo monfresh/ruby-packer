@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 require_relative "../command"
 require_relative "../package"
 require_relative "../installer"
@@ -32,6 +33,11 @@ class Gem::Commands::PristineCommand < Gem::Command
                "in addition to regular gems") do |value, options|
       options[:extensions_set] = true
       options[:extensions]     = value
+    end
+
+    add_option("--only-missing-extensions",
+               "Only restore gems with missing extensions") do |value, options|
+      options[:only_missing_extensions] = value
     end
 
     add_option("--only-executables",
@@ -106,6 +112,10 @@ extensions will be restored.
           options[:extensions] && options[:args].empty?
       Gem::Specification.select do |spec|
         spec.extensions && !spec.extensions.empty?
+      end
+    elsif options[:only_missing_extensions]
+      Gem::Specification.select do |spec|
+        spec.missing_extensions?
       end
     else
       get_all_gem_names.sort.map do |gem_name|

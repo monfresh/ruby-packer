@@ -136,6 +136,14 @@ def extract_makefile(makefile, keep = true)
   true
 end
 
+def create_makefile(target, srcprefix = nil)
+  if $static and target.include?("/")
+    base = File.basename(target)
+    $defs << "-DInit_#{base}=Init_#{target.tr('/', '_')}"
+  end
+  super
+end
+
 def extmake(target, basedir = 'ext', maybestatic = true)
   FileUtils.mkpath target unless File.directory?(target)
   begin
@@ -144,7 +152,7 @@ def extmake(target, basedir = 'ext', maybestatic = true)
     d = target
     until (d = File.dirname(d)) == '.'
       if File.exist?("#{$top_srcdir}/#{basedir}/#{d}/extconf.rb")
-        parent = (/^all:\s*install/ =~ IO.read("#{d}/Makefile") rescue false)
+        parent = (/^all:\s*install/ =~ File.read("#{d}/Makefile") rescue false)
         break
       end
     end
@@ -447,9 +455,8 @@ if $extstatic
 end
 for dir in ["ext", File::join($top_srcdir, "ext")]
   setup = File::join(dir, CONFIG['setup'])
-  if File.file? setup
-    f = open(setup)
-    while line = f.gets()
+  if (f = File.stat(setup) and f.file? rescue next)
+    File.foreach(setup) do |line|
       line.chomp!
       line.sub!(/#.*$/, '')
       next if /^\s*$/ =~ line
@@ -466,7 +473,6 @@ for dir in ["ext", File::join($top_srcdir, "ext")]
     end
     MTIMES << f.mtime
     $setup = setup
-    f.close
     break
   end
 end unless $extstatic
@@ -536,9 +542,14 @@ extend Module.new {
 
   def timestamp_file(name, target_prefix = nil)
     if @gemname and name == '$(TARGET_SO_DIR)'
-      name = "$(arch)/gems/#{@gemname}#{target_prefix}"
+      gem = true
+      name = "$(gem_platform)/$(ruby_version)/gems/#{@gemname}#{target_prefix}"
     end
-    super.sub(%r[/\.extout\.(?:-\.)?], '/.')
+    path = super.sub(%r[/\.extout\.(?:-\.)?], '/.')
+    if gem
+      nil while path.sub!(%r[/\.(gem_platform|ruby_version)\.-(?=\.)], '/$(\1)/')
+    end
+    path
   end
 
   def configuration(srcdir)
@@ -546,7 +557,13 @@ extend Module.new {
   end
 
   def create_makefile(*args, &block)
-    return super unless @gemname
+    unless @gemname
+      if $static and (target = args.first).include?("/")
+        base = File.basename(target)
+        $defs << "-DInit_#{base}=Init_#{target.tr('/', '_')}"
+      end
+      return super
+    end
     super(*args) do |conf|
       conf.find do |s|
         s.sub!(%r(^(srcdir *= *)\$\(top_srcdir\)/\.bundle/gems/[^/]+(?=/))) {
@@ -716,6 +733,8 @@ begin
     mf.puts "ECHO1 = $(V:1=@:)"
     mf.puts "ECHO = $(ECHO1:0=@echo)"
     mf.puts "MFLAGS = -$(MAKEFLAGS)" if $nmake
+    mf.puts "override MFLAGS := $(filter-out -j%,$(MFLAGS))" if $gnumake
+    mf.puts "ext_build_dir = #{File.dirname($command_output)}"
     mf.puts
 
     def mf.macro(name, values, max = 70)
@@ -758,6 +777,7 @@ begin
     mf.macro "SUBMAKEOPTS", submakeopts
     mf.macro "NOTE_MESG", %w[$(RUBY) $(top_srcdir)/tool/lib/colorize.rb skip]
     mf.macro "NOTE_NAME", %w[$(RUBY) $(top_srcdir)/tool/lib/colorize.rb fail]
+    %w[RM RMDIRS RMDIR RMALL].each {|w| mf.macro w, [RbConfig::CONFIG[w]]}
     mf.puts
     targets = %w[all install static install-so install-rb clean distclean realclean]
     targets.each do |tgt|
@@ -792,16 +812,20 @@ begin
       exts.each do |d|
         d = d[0..-2]
         t = "#{d}#{tgt}"
-        if  /^(dist|real)?clean$/ =~ tgt
+        if clean = /^(dist|real)?clean$/.match(tgt)
           deps = exts.select {|e|e.start_with?(d)}.map {|e|"#{e[0..-2]}#{tgt}"} - [t]
-          pd = ' ' + deps.join(' ') unless deps.empty?
+          pd = [' clean-local', *deps].join(' ')
         else
           pext = File.dirname(d)
           pd = " #{pext}/#{tgt}" if exts.include?("#{pext}/.")
         end
         mf.puts "#{t}:#{pd}\n\t$(Q)#{submake} $(MFLAGS) V=$(V) $(@F)"
+        if clean and clean.begin(1)
+          mf.puts "\t$(Q)$(RM) $(ext_build_dir)/exts.mk\n\t$(Q)$(RMDIRS) -p $(@D)"
+        end
       end
     end
+    mf.puts "\n""clean-local:\n\t$(Q)$(RM) $(ext_build_dir)/*~ $(ext_build_dir)/*.bak $(ext_build_dir)/core"
     mf.puts "\n""extso:\n"
     mf.puts "\t@echo EXTSO=$(EXTSO)"
 

@@ -3,6 +3,7 @@ require 'test/unit'
 require 'delegate'
 require 'timeout'
 require 'bigdecimal'
+require 'date'
 require 'rbconfig/sizeof'
 
 class TestRange < Test::Unit::TestCase
@@ -539,6 +540,8 @@ class TestRange < Test::Unit::TestCase
     assert_not_operator(0..10, :===, 11)
     assert_operator(5..nil, :===, 11)
     assert_not_operator(5..nil, :===, 0)
+    assert_operator(nil..10, :===, 0)
+    assert_operator(nil..nil, :===, 0)
   end
 
   def test_eqq_string
@@ -546,7 +549,7 @@ class TestRange < Test::Unit::TestCase
     assert_not_operator('A'..'Z', :===, 'ana')
     assert_operator('A'.., :===, 'ANA')
     assert_operator(..'Z', :===, 'ANA')
-    assert_operator(nil..nil, :===, 'ANA')
+    assert_raise(TypeError) {(nil..nil) === 'ANA'}
   end
 
   def test_eqq_time
@@ -583,6 +586,28 @@ class TestRange < Test::Unit::TestCase
     assert_operator(c.new(0)..c.new(10), :===, c.new(5), bug12003)
   end
 
+  def test_eqq_unbounded_ruby_bug_19864
+    t1 = Date.today
+    t2 = t1 + 1
+    assert_equal(true, (..t1) === t1)
+    assert_equal(false, (..t1) === t2)
+    assert_equal(true, (..t2) === t1)
+    assert_equal(true, (..t2) === t2)
+    assert_equal(false, (...t1) === t1)
+    assert_equal(false, (...t1) === t2)
+    assert_equal(true, (...t2) === t1)
+    assert_equal(false, (...t2) === t2)
+
+    assert_equal(true, (t1..) === t1)
+    assert_equal(true, (t1..) === t2)
+    assert_equal(false, (t2..) === t1)
+    assert_equal(true, (t2..) === t2)
+    assert_equal(true, (t1...) === t1)
+    assert_equal(true, (t1...) === t2)
+    assert_equal(false, (t2...) === t1)
+    assert_equal(true, (t2...) === t2)
+  end
+
   def test_eqq_non_iteratable
     k = Class.new do
       include Comparable
@@ -599,11 +624,16 @@ class TestRange < Test::Unit::TestCase
     assert_include("a"..."z", "y")
     assert_not_include("a"..."z", "z")
     assert_not_include("a".."z", "cc")
-    assert_include("a".., "c")
-    assert_not_include("a".., "5")
+    assert_raise(TypeError) {("a"..).include?("c")}
+    assert_raise(TypeError) {("a"..).include?("5")}
+
     assert_include(0...10, 5)
     assert_include(5..., 10)
     assert_not_include(5..., 0)
+    assert_raise(TypeError) {(.."z").include?("z")}
+    assert_raise(TypeError) {(..."z").include?("z")}
+    assert_include(..10, 10)
+    assert_not_include(...10, 10)
   end
 
   def test_cover
@@ -666,6 +696,35 @@ class TestRange < Test::Unit::TestCase
     assert_not_operator(1..10, :cover?, 3...3)
     assert_not_operator('aa'..'zz', :cover?, 'aa'...'zzz')
     assert_not_operator(1..10, :cover?, 1...10.1)
+
+    assert_operator(..2, :cover?, 1)
+    assert_operator(..2, :cover?, 2)
+    assert_not_operator(..2, :cover?, 3)
+    assert_not_operator(...2, :cover?, 2)
+    assert_not_operator(..2, :cover?, "2")
+    assert_operator(..2, :cover?, ..2)
+    assert_operator(..2, :cover?, ...2)
+    assert_not_operator(..2, :cover?, .."2")
+    assert_not_operator(...2, :cover?, ..2)
+
+    assert_not_operator(2.., :cover?, 1)
+    assert_operator(2.., :cover?, 2)
+    assert_operator(2..., :cover?, 3)
+    assert_operator(2.., :cover?, 2)
+    assert_not_operator(2.., :cover?, "2")
+    assert_operator(2.., :cover?, 2..)
+    assert_operator(2.., :cover?, 2...)
+    assert_not_operator(2.., :cover?, "2"..)
+    assert_not_operator(2..., :cover?, 2..)
+    assert_operator(2..., :cover?, 3...)
+    assert_not_operator(2..., :cover?, 3..)
+    assert_not_operator(3.., :cover?, 2..)
+
+    assert_operator(nil..., :cover?, Object.new)
+    assert_operator(nil..., :cover?, nil...)
+    assert_operator(nil.., :cover?, nil...)
+    assert_not_operator(nil..., :cover?, nil..)
+    assert_not_operator(nil..., :cover?, 1..)
   end
 
   def test_beg_len
@@ -744,6 +803,9 @@ class TestRange < Test::Unit::TestCase
     assert_equal 5, (1.1...6).size
     assert_equal 42, (1..42).each.size
     assert_nil ("a"..."z").size
+    assert_nil ("a"...).size
+    assert_nil (..."z").size    # [Bug #18983]
+    assert_nil (nil...nil).size # [Bug #18983]
 
     assert_equal Float::INFINITY, (1...).size
     assert_equal Float::INFINITY, (1.0...).size

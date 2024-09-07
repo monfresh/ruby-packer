@@ -1,6 +1,7 @@
 require 'rbconfig'
 require 'timeout'
 require 'fileutils'
+require_relative 'lib/colorize'
 
 ENV.delete("GNUMAKEFLAGS")
 
@@ -11,10 +12,10 @@ allowed_failures = allowed_failures.split(',').reject(&:empty?)
 
 ENV["GEM_PATH"] = [File.realpath('.bundle'), File.realpath('../.bundle', __dir__)].join(File::PATH_SEPARATOR)
 
+colorize = Colorize.new
 rake = File.realpath("../../.bundle/bin/rake", __FILE__)
 gem_dir = File.realpath('../../gems', __FILE__)
-dummy_rake_compiler_dir = File.realpath('../dummy-rake-compiler', __FILE__)
-rubylib = [File.expand_path(dummy_rake_compiler_dir), ENV["RUBYLIB"]].compact.join(File::PATH_SEPARATOR)
+rubylib = [gem_dir+'/lib', ENV["RUBYLIB"]].compact.join(File::PATH_SEPARATOR)
 exit_code = 0
 ruby = ENV['RUBY'] || RbConfig.ruby
 failed = []
@@ -25,7 +26,6 @@ File.foreach("#{gem_dir}/bundled_gems") do |line|
   puts "#{github_actions ? "##[group]" : "\n"}Testing the #{gem} gem"
 
   test_command = "#{ruby} -C #{gem_dir}/src/#{gem} #{rake} test"
-  envs = {}
   first_timeout = 600 # 10min
 
   toplib = gem
@@ -33,13 +33,18 @@ File.foreach("#{gem_dir}/bundled_gems") do |line|
   when "typeprof"
 
   when "rbs"
-    test_command << " stdlib_test validate"
-    first_timeout *= 3
+    # TODO: We should skip test file instead of test class/methods
+    skip_test_files = %w[
+      test/stdlib/Prime_test.rb
+    ]
 
-  when "minitest"
-    # Tentatively exclude some tests that conflict with error_highlight
-    # https://github.com/seattlerb/minitest/pull/880
-    test_command << " 'TESTOPTS=-e /test_stub_value_block_args_5__break_if_not_passed|test_no_method_error_on_unexpected_methods/'"
+    skip_test_files.each do |file|
+      path = "#{gem_dir}/src/#{gem}/#{file}"
+      File.unlink(path) if File.exist?(path)
+    end
+
+    test_command << " stdlib_test validate RBS_SKIP_TESTS=#{__dir__}/rbs_skip_tests"
+    first_timeout *= 3
 
   when "debug"
     # Since debug gem requires debug.so in child processes without
@@ -47,10 +52,8 @@ File.foreach("#{gem_dir}/bundled_gems") do |line|
     # environment variable.
     load_path = true
 
-    # disable remote test in debug.gem on macOS
-    if /darwin/ =~ RUBY_PLATFORM
-      envs["RUBY_DEBUG_TEST_NO_REMOTE"] = "1"
-    end
+  when "test-unit"
+    test_command = "#{ruby} -C #{gem_dir}/src/#{gem} test/run-test.rb"
 
   when /\Anet-/
     toplib = gem.tr("-", "/")
@@ -68,7 +71,7 @@ File.foreach("#{gem_dir}/bundled_gems") do |line|
 
   print "[command]" if github_actions
   puts test_command
-  pid = Process.spawn(envs, test_command, "#{/mingw|mswin/ =~ RUBY_PLATFORM ? 'new_' : ''}pgroup": true)
+  pid = Process.spawn(test_command, "#{/mingw|mswin/ =~ RUBY_PLATFORM ? 'new_' : ''}pgroup": true)
   {nil => first_timeout, INT: 30, TERM: 10, KILL: nil}.each do |sig, sec|
     if sig
       puts "Sending #{sig} signal"
@@ -85,19 +88,21 @@ File.foreach("#{gem_dir}/bundled_gems") do |line|
     break
   end
 
+  print "##[endgroup]\n" if github_actions
   unless $?.success?
 
-    puts "Tests failed " +
-         ($?.signaled? ? "by SIG#{Signal.signame($?.termsig)}" :
-            "with exit code #{$?.exitstatus}")
+    mesg = "Tests failed " +
+           ($?.signaled? ? "by SIG#{Signal.signame($?.termsig)}" :
+              "with exit code #{$?.exitstatus}")
+    puts colorize.decorate(mesg, "fail")
     if allowed_failures.include?(gem)
-      puts "Ignoring test failures for #{gem} due to \$TEST_BUNDLED_GEMS_ALLOW_FAILURES"
+      mesg = "Ignoring test failures for #{gem} due to \$TEST_BUNDLED_GEMS_ALLOW_FAILURES"
+      puts colorize.decorate(mesg, "skip")
     else
       failed << gem
       exit_code = $?.exitstatus if $?.exitstatus
     end
   end
-  print "##[endgroup]\n" if github_actions
 end
 
 puts "Failed gems: #{failed.join(', ')}" unless failed.empty?

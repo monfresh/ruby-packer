@@ -59,7 +59,7 @@ class TestWeakMap < Test::Unit::TestCase
       assert_weak_include(m, k)
     end
     GC.start
-    skip('TODO: failure introduced from r60440')
+    pend('TODO: failure introduced from 837fd5e494731d7d44786f29e7d6e8c27029806f')
     assert_not_send([@wm, m, k])
   end
   alias test_member? test_include?
@@ -166,5 +166,51 @@ class TestWeakMap < Test::Unit::TestCase
     o = Object.new.freeze
     assert_nothing_raised(FrozenError) {@wm[o] = 'foo'}
     assert_nothing_raised(FrozenError) {@wm['foo'] = o}
+  end
+
+  def test_no_memory_leak
+    assert_no_memory_leak([], '', "#{<<~"begin;"}\n#{<<~'end;'}", "[Bug #19398]", rss: true, limit: 1.5, timeout: 60)
+    begin;
+      1_000_000.times do
+        ObjectSpace::WeakMap.new
+      end
+    end;
+  end
+
+  def test_compaction_bug_19529
+    omit "compaction is not supported on this platform" unless GC.respond_to?(:compact)
+
+    obj = Object.new
+    100.times do |i|
+      GC.compact
+      @wm[i] = obj
+    end
+
+    assert_separately(%w(--disable-gems), <<-'end;')
+      wm = ObjectSpace::WeakMap.new
+      obj = Object.new
+      100.times do
+        wm[Object.new] = obj
+        GC.start
+      end
+      GC.compact
+    end;
+  end
+
+  def test_replaced_values_bug_19531
+    a = "A".dup
+    b = "B".dup
+
+    @wm[1] = a
+    @wm[1] = a
+    @wm[1] = a
+
+    @wm[1] = b
+    assert_equal b, @wm[1]
+
+    a = nil
+    GC.start
+
+    assert_equal b, @wm[1]
   end
 end

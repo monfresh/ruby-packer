@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 require_relative "../command"
 require_relative "../version_option"
 require_relative "../uninstaller"
@@ -124,6 +125,9 @@ that is a dependency of an existing gem.  You can use the
 
   def execute
     check_version
+
+    # Consider only gem specifications installed at `--install-dir`
+    Gem::Specification.dirs = options[:install_dir] if options[:install_dir]
 
     if options[:all] && !options[:args].empty?
       uninstall_specific

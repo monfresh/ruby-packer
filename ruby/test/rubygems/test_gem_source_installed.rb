@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 require_relative "helper"
 require "rubygems/source"
 
@@ -11,7 +12,7 @@ class TestGemSourceInstalled < Gem::TestCase
     specific  = Gem::Source::SpecificFile.new a1.cache_file
     installed = Gem::Source::Installed.new
     local     = Gem::Source::Local.new
-    git       = Gem::Source::Git.new "a", "a", "master"
+    git       = Gem::Source::Git.new "a", "a", nil
     vendor    = Gem::Source::Vendor.new "a"
 
     assert_equal(0, installed.<=>(installed), "installed <=> installed")

@@ -28,8 +28,16 @@
  * SUCH DAMAGE.
  */
 
+// Suppress some false-positive compiler warnings
+#if defined(__GNUC__) && __GNUC__ >= 12
+#pragma GCC diagnostic ignored "-Warray-bounds"
+#pragma GCC diagnostic ignored "-Wstringop-overflow"
+#pragma GCC diagnostic ignored "-Wrestrict"
+#endif
+
 #include "regparse.h"
 #include <stdarg.h>
+#include "internal/sanitizers.h"
 
 #define WARN_BUFSIZE    256
 
@@ -386,6 +394,8 @@ str_end_cmp(st_data_t xp, st_data_t yp)
 
   return 0;
 }
+
+NO_SANITIZE("unsigned-integer-overflow", static st_index_t str_end_hash(st_data_t xp));
 
 static st_index_t
 str_end_hash(st_data_t xp)
@@ -5967,7 +5977,8 @@ node_extended_grapheme_cluster(Node** np, ScanEnv* env)
           R_ERR(add_code_range(&(cc->mbuf), env, 0x000A, 0x000A)); /* CR */
           R_ERR(add_code_range(&(cc->mbuf), env, 0x000D, 0x000D)); /* LF */
           R_ERR(not_code_range_buf(env->enc, cc->mbuf, &inverted_buf, env));
-          cc->mbuf = inverted_buf; /* TODO: check what to do with buffer before inversion */
+          bbuf_free(cc->mbuf);
+          cc->mbuf = inverted_buf;
 
           env->warnings_flag &= dup_not_warned; /* TODO: fix false warning */
         }

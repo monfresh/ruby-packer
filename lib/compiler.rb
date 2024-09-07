@@ -100,7 +100,7 @@ class Compiler
     log "- options: #{@options}"
     log
 
-    @ldflags = ''
+    @ldflags = '-L/opt/homebrew/opt/bison/lib'
     @cflags = if Gem.win_platform?
                 if @options[:debug]
                   ' -MD /DEBUG:FULL /Od -Zi '
@@ -111,7 +111,7 @@ class Compiler
                 ' -DRUBY_DEBUG -fPIC -g -O0 -pipe '
               else
                 #' -DRUBY_DEBUG -fPIC -O3 -fno-fast-math -ggdb3 -Os -fdata-sections -ffunction-sections -pipe -Wno-error=implicit-function-declaration '
-                ' -fPIC -O3 -fno-fast-math -Os -fdata-sections -ffunction-sections -pipe '
+                ' -fPIC '
               end
 
     # install prefix for stuffed libraries
@@ -168,7 +168,7 @@ class Compiler
     @options[:output] += '.exe' if Gem.win_platform? && !@options[:output].end_with?('.exe')
     @options[:tmpdir] ||= File.expand_path('rubyc', Dir.tmpdir)
     @options[:tmpdir] = File.expand_path(@options[:tmpdir])
-    @options[:openssl_dir] ||= '/usr/local/etc/openssl/'
+    @options[:openssl_dir] ||= '/private/etc/ssl'
     @options[:ignore_file] = File.readlines('.rubycignore').map(&:strip) if File.exist?('.rubycignore')
   end
 
@@ -189,11 +189,11 @@ class Compiler
     copy_ruby_source unless Dir.exist?(@ruby_source_dir)
     stuff_zlib
     stuff_openssl
-    stuff_gdbm
+    #stuff_gdbm
     stuff_yaml
-    stuff_libffi
-    stuff_ncurses
-    stuff_readline
+    #stuff_libffi
+    #stuff_ncurses
+    #stuff_readline
     prepare_pass1_flags
     patch_common_mk
     patch_win32_makefile_sub if Gem.win_platform?

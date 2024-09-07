@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 require_relative "helper"
 require "rubygems/request_set"
 require "rubygems/request_set/lockfile"
@@ -257,7 +258,7 @@ DEPENDENCIES
     write_lockfile <<-LOCKFILE
 GIT
   remote: git://example/a.git
-  revision: master
+  revision: abranch
   specs:
     a (2)
       b (>= 3)
@@ -275,7 +276,7 @@ DEPENDENCIES
       Gem::Resolver::LockSet === set
     end
 
-    refute lockfile_set, "fount a LockSet"
+    refute lockfile_set, "found a LockSet"
 
     git_set = @set.sets.find do |set|
       Gem::Resolver::GitSet === set
@@ -289,7 +290,7 @@ DEPENDENCIES
                  git_set.specs.values.first.dependencies
 
     expected = {
-      "a" => %w[git://example/a.git master],
+      "a" => %w[git://example/a.git abranch],
     }
 
     assert_equal expected, git_set.repositories
@@ -318,7 +319,7 @@ DEPENDENCIES
       Gem::Resolver::LockSet === set
     end
 
-    refute lockfile_set, "fount a LockSet"
+    refute lockfile_set, "found a LockSet"
 
     git_set = @set.sets.find do |set|
       Gem::Resolver::GitSet === set
@@ -355,7 +356,7 @@ DEPENDENCIES
       Gem::Resolver::LockSet === set
     end
 
-    refute lockfile_set, "fount a LockSet"
+    refute lockfile_set, "found a LockSet"
 
     git_set = @set.sets.find do |set|
       Gem::Resolver::GitSet === set
@@ -392,7 +393,7 @@ DEPENDENCIES
       Gem::Resolver::LockSet === set
     end
 
-    refute lockfile_set, "fount a LockSet"
+    refute lockfile_set, "found a LockSet"
 
     git_set = @set.sets.find do |set|
       Gem::Resolver::GitSet === set

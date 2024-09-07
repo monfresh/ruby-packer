@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 require_relative "helper"
 require "rubygems/request_set"
 
@@ -95,7 +96,7 @@ class TestGemRequestSetGemDependencyAPI < Gem::TestCase
 
     assert_equal [dep("a")], @set.dependencies
 
-    assert_equal %w[git/a master], @git_set.repositories["a"]
+    assert_equal ["git/a", nil], @git_set.repositories["a"]
 
     expected = { "a" => Gem::Requirement.create("!") }
 
@@ -107,7 +108,7 @@ class TestGemRequestSetGemDependencyAPI < Gem::TestCase
 
     assert_equal [dep("a")], @set.dependencies
 
-    assert_equal %w[https://example@bitbucket.org/example/repository.git master],
+    assert_equal ["https://example@bitbucket.org/example/repository.git", nil],
                  @git_set.repositories["a"]
 
     expected = { "a" => Gem::Requirement.create("!") }
@@ -120,7 +121,7 @@ class TestGemRequestSetGemDependencyAPI < Gem::TestCase
 
     assert_equal [dep("a")], @set.dependencies
 
-    assert_equal %w[https://example@bitbucket.org/example/example.git master],
+    assert_equal ["https://example@bitbucket.org/example/example.git", nil],
                  @git_set.repositories["a"]
 
     expected = { "a" => Gem::Requirement.create("!") }
@@ -145,7 +146,7 @@ class TestGemRequestSetGemDependencyAPI < Gem::TestCase
 
     assert_equal [dep("a")], @set.dependencies
 
-    assert_equal %w[https://gist.github.com/a.git master],
+    assert_equal ["https://gist.github.com/a.git", nil],
                  @git_set.repositories["a"]
   end
 
@@ -166,7 +167,7 @@ class TestGemRequestSetGemDependencyAPI < Gem::TestCase
 
     assert_equal [dep("a")], @set.dependencies
 
-    assert_equal %w[git/a master], @git_set.repositories["a"]
+    assert_equal ["git/a", nil], @git_set.repositories["a"]
     assert_equal %w[git/a], @git_set.need_submodules.keys
   end
 
@@ -183,7 +184,7 @@ class TestGemRequestSetGemDependencyAPI < Gem::TestCase
 
     assert_equal [dep("a")], @set.dependencies
 
-    assert_equal %w[https://github.com/example/repository.git master],
+    assert_equal ["https://github.com/example/repository.git", nil],
                  @git_set.repositories["a"]
 
     expected = { "a" => Gem::Requirement.create("!") }
@@ -196,7 +197,7 @@ class TestGemRequestSetGemDependencyAPI < Gem::TestCase
 
     assert_equal [dep("a")], @set.dependencies
 
-    assert_equal %w[https://github.com/example/example.git master],
+    assert_equal ["https://github.com/example/example.git", nil],
                  @git_set.repositories["a"]
 
     expected = { "a" => Gem::Requirement.create("!") }
@@ -609,8 +610,8 @@ class TestGemRequestSetGemDependencyAPI < Gem::TestCase
 
     assert_equal [dep("a"), dep("b")], @set.dependencies
 
-    assert_equal %w[git://example/repo.git master], @git_set.repositories["a"]
-    assert_equal %w[git://example/repo.git master], @git_set.repositories["b"]
+    assert_equal ["git://example/repo.git", nil], @git_set.repositories["a"]
+    assert_equal ["git://example/repo.git", nil], @git_set.repositories["b"]
   end
 
   def test_git_source
@@ -620,7 +621,7 @@ class TestGemRequestSetGemDependencyAPI < Gem::TestCase
 
     @gda.gem "a", :example => "repo"
 
-    assert_equal %w[git://example/repo.git master], @git_set.repositories["a"]
+    assert_equal ["git://example/repo.git", nil], @git_set.repositories["a"]
   end
 
   def test_group

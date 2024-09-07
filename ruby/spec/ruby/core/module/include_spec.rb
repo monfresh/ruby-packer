@@ -104,9 +104,9 @@ describe "Module#include" do
       class A; include M; end
       class B < A; include M; end
 
-      all = [A,B,M]
+      all = [A, B, M]
 
-      (B.ancestors & all).should == [B, A, M]
+      (B.ancestors.filter { |a| all.include?(a) }).should == [B, A, M]
     end
   end
 
@@ -531,6 +531,27 @@ describe "Module#include" do
       B.include M
       B.foo.should == 'n'
     end
+  end
+
+  it "overrides a previous super method call" do
+    c1 = Class.new do
+      def foo
+        [:c1]
+      end
+    end
+    c2 = Class.new(c1) do
+      def foo
+        [:c2] + super
+      end
+    end
+    c2.new.foo.should == [:c2, :c1]
+    m = Module.new do
+      def foo
+        [:m1]
+      end
+    end
+    c2.include(m)
+    c2.new.foo.should == [:c2, :m1]
   end
 end
 

@@ -100,6 +100,20 @@ class TestRipper::Lexer < Test::Unit::TestCase
     assert_equal expect, Ripper.lex(src).map {|e| e[1]}
   end
 
+  def test_end_of_script_char
+    all_assertions do |all|
+      ["a", %w"[a ]", %w"{, }", "if"].each do |src, append|
+        expected = Ripper.lex(src).map {|e| e[1]}
+        ["\0b", "\4b", "\32b"].each do |eof|
+          c = "#{src}#{eof}#{append}"
+          all.for(c) do
+            assert_equal expected, Ripper.lex(c).map {|e| e[1]}
+          end
+        end
+      end
+    end
+  end
+
   def test_slice
     assert_equal "string\#{nil}\n",
       Ripper.slice(%(<<HERE\nstring\#{nil}\nHERE), "heredoc_beg .*? nl $(.*?) heredoc_end", 1)
@@ -227,5 +241,77 @@ class TestRipper::Lexer < Test::Unit::TestCase
       EOS
     EOF
     assert_equal([[5, 0], :on_heredoc_end, "EOS\n", state(:EXPR_BEG)], Ripper.lex(s).last, bug)
+  end
+
+  def test_tokenize_with_here_document
+    bug = '[Bug #18963]'
+    code = %[
+<<A + "hello
+A
+world"
+]
+    assert_equal(code, Ripper.tokenize(code).join(""), bug)
+  end
+
+  def test_heredoc_inside_block_param
+    bug = '[Bug #19399]'
+    code = <<~CODE
+      a do |b
+        <<-C
+        C
+        |
+      end
+    CODE
+    assert_equal(code, Ripper.tokenize(code).join(""), bug)
+  end
+
+  def test_invalid_escape_ctrl_mbchar
+    code = %["\\C-\u{3042}"]
+    expected = [
+      [[1, 0], :on_tstring_beg, '"', state(:EXPR_BEG)],
+      [[1, 1], :on_tstring_content, "\\C-\u{3042}", state(:EXPR_BEG)],
+      [[1, 7], :on_tstring_end, '"', state(:EXPR_END)],
+    ]
+
+    assert_lexer(expected, code)
+  end
+
+  def test_invalid_escape_meta_mbchar
+    code = %["\\M-\u{3042}"]
+    expected = [
+      [[1, 0], :on_tstring_beg, '"', state(:EXPR_BEG)],
+      [[1, 1], :on_tstring_content, "\\M-\u{3042}", state(:EXPR_BEG)],
+      [[1, 7], :on_tstring_end, '"', state(:EXPR_END)],
+    ]
+
+    assert_lexer(expected, code)
+  end
+
+  def test_invalid_escape_meta_ctrl_mbchar
+    code = %["\\M-\\C-\u{3042}"]
+    expected = [
+      [[1, 0], :on_tstring_beg, '"', state(:EXPR_BEG)],
+      [[1, 1], :on_tstring_content, "\\M-\\C-\u{3042}", state(:EXPR_BEG)],
+      [[1, 10], :on_tstring_end, '"', state(:EXPR_END)],
+    ]
+
+    assert_lexer(expected, code)
+  end
+
+  def test_invalid_escape_ctrl_meta_mbchar
+    code = %["\\C-\\M-\u{3042}"]
+    expected = [
+      [[1, 0], :on_tstring_beg, '"', state(:EXPR_BEG)],
+      [[1, 1], :on_tstring_content, "\\C-\\M-\u{3042}", state(:EXPR_BEG)],
+      [[1, 10], :on_tstring_end, '"', state(:EXPR_END)],
+    ]
+
+    assert_lexer(expected, code)
+  end
+
+  def assert_lexer(expected, code)
+    assert_equal(code, Ripper.tokenize(code).join(""))
+    assert_equal(expected, result = Ripper.lex(code),
+                 proc {expected.zip(result) {|e, r| break diff(e, r) unless e == r}})
   end
 end

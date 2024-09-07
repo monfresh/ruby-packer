@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 require_relative "../command"
 require_relative "../local_remote_options"
 require_relative "../gemcutter_utilities"
@@ -15,7 +16,7 @@ The owner command lets you add and remove owners of a gem on a push
 server (the default is https://rubygems.org). Multiple owners can be
 added or removed at the same time, if the flag is given multiple times.
 
-The supported user identifiers are dependant on the push server.
+The supported user identifiers are dependent on the push server.
 For rubygems.org, both e-mail and handle are supported, even though the
 user identifier field is called "email".
 
@@ -98,8 +99,10 @@ permission to.
         action = method == :delete ? "Removing" : "Adding"
 
         with_response response, "#{action} #{owner}"
-      rescue
-        # ignore
+      rescue Gem::WebauthnVerificationError => e
+        raise e
+      rescue StandardError
+        # ignore early exits to allow for completing the iteration of all owners
       end
     end
   end
