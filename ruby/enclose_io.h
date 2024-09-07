@@ -11,7 +11,6 @@
 
 #include "enclose_io_prelude.h"
 #include "enclose_io_common.h"
-#include "enclose_io_win32.h"
 #include "enclose_io_unix.h"
 
 #endif

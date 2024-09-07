@@ -200,7 +200,6 @@ struct stati128 {
 #define fstat(fd,st)		rb_w32_fstati128(fd,st)
 #define stati128(path, st)	rb_w32_ustati128(path,st)
 #define lstat(path,st)		rb_w32_ulstati128(path,st)
-#define access(path,mode)	rb_w32_uaccess(path,mode)
 
 #define strcasecmp		_stricmp
 #define strncasecmp		_strnicmp

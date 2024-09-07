@@ -454,7 +454,6 @@ class Compiler
         f.puts ''
         f.puts '#include "enclose_io_prelude.h"'
         f.puts '#include "enclose_io_common.h"'
-        f.puts '#include "enclose_io_win32.h"'
         f.puts '#include "enclose_io_unix.h"'
         f.puts ''
         f.puts '#define ENCLOSE_IO_RUBYC_BUILD_PASS2 1'
