@@ -189,11 +189,11 @@ class Compiler
     copy_ruby_source unless Dir.exist?(@ruby_source_dir)
     stuff_zlib
     stuff_openssl
-    stuff_gdbm
+    #stuff_gdbm
     stuff_yaml
-    stuff_libffi
-    stuff_ncurses
-    stuff_readline
+    #stuff_libffi
+    #stuff_ncurses
+    #stuff_readline
     prepare_pass1_flags
     patch_common_mk
     patch_win32_makefile_sub if Gem.win_platform?

@@ -640,14 +640,14 @@ int enclose_io_access(const char *path, int mode)
 		ENCLOSE_IO_CONSIDER_MKDIR_WORKDIR_RETURN(
 			enclose_io_expanded,
 			squash_stat(enclose_io_fs, enclose_io_expanded, &buf),
-			access(mkdir_workdir_expanded, &buf)
+			access(mkdir_workdir_expanded, buf.st_mode)
 		);
 	} else if (enclose_io_is_path(path)) {
 		struct stat buf;
 		ENCLOSE_IO_CONSIDER_MKDIR_WORKDIR_RETURN(
 			path,
 			squash_stat(enclose_io_fs, path, &buf),
-			access(mkdir_workdir_expanded, &buf)
+			access(mkdir_workdir_expanded, buf.st_mode)
 		);
 	} else {
 		return access(path, mode);
