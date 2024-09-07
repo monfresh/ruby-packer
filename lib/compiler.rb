@@ -111,7 +111,7 @@ class Compiler
                 ' -DRUBY_DEBUG -fPIC -g -O0 -pipe '
               else
                 #' -DRUBY_DEBUG -fPIC -O3 -fno-fast-math -ggdb3 -Os -fdata-sections -ffunction-sections -pipe -Wno-error=implicit-function-declaration '
-                ' -fPIC '
+                ' -fPIC -O3 -fno-fast-math -Os -fdata-sections -ffunction-sections -pipe '
               end
 
     # install prefix for stuffed libraries
@@ -168,7 +168,7 @@ class Compiler
     @options[:output] += '.exe' if Gem.win_platform? && !@options[:output].end_with?('.exe')
     @options[:tmpdir] ||= File.expand_path('rubyc', Dir.tmpdir)
     @options[:tmpdir] = File.expand_path(@options[:tmpdir])
-    @options[:openssl_dir] ||= '/private/etc/ssl'
+    @options[:openssl_dir] ||= '/usr/local/etc/ssl'
     @options[:ignore_file] = File.readlines('.rubycignore').map(&:strip) if File.exist?('.rubycignore')
   end
 
@@ -454,6 +454,7 @@ class Compiler
         f.puts ''
         f.puts '#include "enclose_io_prelude.h"'
         f.puts '#include "enclose_io_common.h"'
+        f.puts '#include "enclose_io_win32.h"'
         f.puts '#include "enclose_io_unix.h"'
         f.puts ''
         f.puts '#define ENCLOSE_IO_RUBYC_BUILD_PASS2 1'

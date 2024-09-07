@@ -107,6 +107,7 @@ COMMONOBJS    = squash_cache.$(OBJEXT) \
 		squash_traverse.$(OBJEXT) \
 		squash_util.$(OBJEXT) \
 		enclose_io_unix.$(OBJEXT) \
+		enclose_io_win32.$(OBJEXT) \
 		array.$(OBJEXT) \
 		ast.$(OBJEXT) \
 		bignum.$(OBJEXT) \
@@ -1061,6 +1062,13 @@ miniprelude.$(OBJEXT): {$(VPATH)}miniprelude.c
 
 # dependencies for optional sources.
 compile.$(OBJEXT): {$(VPATH)}opt_sc.inc {$(VPATH)}optunifs.inc
+
+win32/win32.$(OBJEXT): {$(VPATH)}win32/win32.c {$(VPATH)}win32/file.h \
+  {$(VPATH)}dln.h {$(VPATH)}dln_find.c {$(VPATH)}encindex.h \
+  {$(VPATH)}internal.h {$(VPATH)}util.h $(RUBY_H_INCLUDES) \
+  {$(VPATH)}vm.h $(PLATFORM_D)
+win32/file.$(OBJEXT): {$(VPATH)}win32/file.c {$(VPATH)}win32/file.h \
+  $(RUBY_H_INCLUDES) $(PLATFORM_D)
 
 $(NEWLINE_C): $(srcdir)/enc/trans/newline.trans $(tooldir)/transcode-tblgen.rb
 	$(Q) $(MAKEDIRS) $(@D)

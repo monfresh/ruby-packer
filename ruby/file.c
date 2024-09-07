@@ -103,6 +103,8 @@ int flock(int, int);
 # define STAT(p, s)      rb_w32_ustati128((p), (s))
 # undef lstat
 # define lstat(p, s)     rb_w32_ulstati128((p), (s))
+# undef access
+# define access(p, m)    rb_w32_uaccess((p), (m))
 # undef truncate
 # define truncate(p, n)  rb_w32_utruncate((p), (n))
 # undef chmod
