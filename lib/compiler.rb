@@ -168,7 +168,7 @@ class Compiler
     @options[:output] += '.exe' if Gem.win_platform? && !@options[:output].end_with?('.exe')
     @options[:tmpdir] ||= File.expand_path('rubyc', Dir.tmpdir)
     @options[:tmpdir] = File.expand_path(@options[:tmpdir])
-    @options[:openssl_dir] ||= '/usr/local/etc/ssl'
+    @options[:openssl_dir] ||= '/usr/local/etc/openssl'
     @options[:ignore_file] = File.readlines('.rubycignore').map(&:strip) if File.exist?('.rubycignore')
   end
 

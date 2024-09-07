@@ -1,0 +1,5 @@
+#!/bin/bash
+
+set -e -o pipefail
+
+PATH="$(brew --prefix bison)/bin:$PATH" bundle exec rake rubyc
