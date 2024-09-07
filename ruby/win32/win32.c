@@ -63,6 +63,9 @@
 #include "internal/static_assert.h"
 #include "ruby/internal/stdbool.h"
 #include "encindex.h"
+// --------- [Enclose.IO Hack start] ---------
+#include "enclose_io.h"
+// --------- [Enclose.IO Hack end] ---------
 #define isdirsep(x) ((x) == '/' || (x) == '\\')
 
 #if defined _MSC_VER && _MSC_VER <= 1200
@@ -925,6 +928,25 @@ rb_w32_sysinit(int *argc, char ***argv)
     //
     *argc = w32_cmdvector(GetCommandLineW(), argv, CP_UTF8, &OnigEncodingUTF_8);
 
+// --------- [Enclose.IO Hack start] ---------
+#ifdef ENCLOSE_IO_ENTRANCE
+        new_argc = *argc;
+        new_argv = *argv;
+        if (NULL == getenv("ENCLOSE_IO_USE_ORIGINAL_RUBY")) {
+                new_argv = (char **)malloc( (*argc + 1) * sizeof(char *));
+                assert(new_argv);
+                new_argv[0] = (*argv)[0];
+                new_argv[1] = ENCLOSE_IO_ENTRANCE;
+                for (i = 1; i < *argc; ++i) {
+                    new_argv[2 + i - 1] = (*argv)[i];
+                }
+                new_argc = *argc + 1;
+
+                *argc = new_argc;
+                *argv = new_argv;
+        }
+#endif
+// --------- [Enclose.IO Hack end] ---------
     //
     // Now set up the correct time stuff
     //
