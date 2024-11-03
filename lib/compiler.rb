@@ -809,7 +809,7 @@ class Compiler
 
       @cflags += " -I#{@utils.escape @ruby_source_dir} "
       @cflags += " -I#{@utils.escape File.join(@local_build, 'include')} "
-      @cflags += " -I#{@utils.escape File.join(lib, 'libffi-3.4.2', 'include')} "
+      # @cflags += " -I#{@utils.escape File.join(lib, 'libffi-3.4.2', 'include')} "
     end
   end
 

@@ -18,7 +18,7 @@ file((Gem.win_platform? ? 'rubyc.exe' : 'rubyc') => rubyc_deps) do
   rm_f(Gem.win_platform? ? 'rubyc.exe' : 'rubyc')
 
   ruby_args = ['bin/rubyc', 'bin/rubyc', '-o', 'rubyc']
-  if ENV['ENCLOSE_IO_RUBYC_ADDTIONAL_ARGS'].present?
+  if ENV['ENCLOSE_IO_RUBYC_ADDTIONAL_ARGS']#.present?
     ENV['ENCLOSE_IO_RUBYC_ADDTIONAL_ARGS'].split(/\s+/).each do |arg|
       ruby_args << arg.strip
     end
